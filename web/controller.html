@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Kart Controller</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #111;
+    color: #eee;
+    font-family: -apple-system, sans-serif;
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+  }
+  #status { position: fixed; top: 8px; left: 8px; font-size: 12px; opacity: 0.6; }
+  #connect {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 16px;
+  }
+  #connect input { font-size: 18px; padding: 8px; width: 70%; }
+  #connect button { font-size: 18px; padding: 10px 24px; }
+  #pad {
+    display: none;
+    position: fixed; inset: 0;
+    grid-template-columns: 1fr 1fr;
+  }
+  .side { display: flex; flex-direction: column; justify-content: flex-end; gap: 12px; padding: 16px; }
+  .btn {
+    background: #333; border: 2px solid #555; border-radius: 16px;
+    color: #eee; font-size: 20px; padding: 24px; text-align: center;
+  }
+  .btn.active { background: #4a7; }
+  #tilt-readout { position: fixed; top: 8px; right: 8px; font-size: 12px; opacity: 0.6; }
+</style>
+</head>
+<body>
+  <div id="connect">
+    <div>Controller server address</div>
+    <input id="addr" placeholder="ws://192.168.1.10:8765/player2" />
+    <button id="go">Connect</button>
+  </div>
+  <div id="status"></div>
+  <div id="tilt-readout"></div>
+  <div id="pad" style="display:none; grid-template-columns: 1fr 1fr;">
+    <div class="side">
+      <div class="btn" id="btn-brake">BRAKE</div>
+    </div>
+    <div class="side">
+      <div class="btn" id="btn-drift">DRIFT</div>
+      <div class="btn" id="btn-accel">ACCEL</div>
+    </div>
+  </div>
+
+<script>
+let ws = null;
+let steer = 0;
+const state = { accel: false, brake: false, drift: false };
+
+function send() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ steer, accel: state.accel, brake: state.brake, drift: state.drift }));
+}
+
+function bindHold(id, key) {
+  const el = document.getElementById(id);
+  const on = (e) => { e.preventDefault(); state[key] = true; el.classList.add('active'); send(); };
+  const off = (e) => { e.preventDefault(); state[key] = false; el.classList.remove('active'); send(); };
+  el.addEventListener('touchstart', on);
+  el.addEventListener('touchend', off);
+  el.addEventListener('touchcancel', off);
+  el.addEventListener('mousedown', on);
+  el.addEventListener('mouseup', off);
+}
+
+bindHold('btn-accel', 'accel');
+bindHold('btn-brake', 'brake');
+bindHold('btn-drift', 'drift');
+
+function handleOrientation(e) {
+  const gamma = e.gamma || 0;
+  steer = Math.max(-1, Math.min(1, gamma / 30));
+  document.getElementById('tilt-readout').textContent = 'tilt ' + gamma.toFixed(1);
+  send();
+}
+
+document.getElementById('go').addEventListener('click', async () => {
+  const addr = document.getElementById('addr').value.trim();
+  if (!addr) return;
+
+  if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+    try {
+      const perm = await DeviceOrientationEvent.requestPermission();
+      if (perm !== 'granted') {
+        document.getElementById('status').textContent = 'motion permission denied';
+        return;
+      }
+    } catch (err) {
+      document.getElementById('status').textContent = 'motion permission error: ' + err;
+      return;
+    }
+  }
+
+  ws = new WebSocket(addr);
+  ws.onopen = () => {
+    document.getElementById('status').textContent = 'connected';
+    document.getElementById('connect').style.display = 'none';
+    document.getElementById('pad').style.display = 'grid';
+    window.addEventListener('deviceorientation', handleOrientation);
+    setInterval(send, 50);
+  };
+  ws.onclose = () => { document.getElementById('status').textContent = 'disconnected'; };
+  ws.onerror = () => { document.getElementById('status').textContent = 'connection error'; };
+});
+</script>
+</body>
+</html>
