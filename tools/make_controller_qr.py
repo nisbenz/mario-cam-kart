@@ -6,17 +6,23 @@ phone controller page URL with that player's own WebSocket port baked in
 melonDS's native PhoneController listens directly on these ports (one
 per EmuInstance in a multi-phone session) — no external bridge process
 involved. Each instance's own QR overlay (see Window.cpp) loads its file
-by a predictable path: /tmp/ds64_qr_p<N>.png.
+by a predictable path: <system temp dir>/ds64_qr_p<N>.png — the same
+directory Qt's QDir::tempPath() resolves to on Windows/Linux/macOS, so
+this and Window.cpp always agree without either side hardcoding an
+OS-specific path like "/tmp" (which doesn't exist on Windows).
 
-Usage: .venv/bin/python tools/make_controller_qr.py [web_port] [base_ws_port]
+Usage: python tools/make_controller_qr.py [web_port] [base_ws_port]
 """
 
 import socket
 import sys
+import tempfile
+from pathlib import Path
 
 import qrcode
 
 MAX_PLAYERS = 4
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def local_ip() -> str:
@@ -33,6 +39,7 @@ def main() -> None:
     base_ws_port = int(sys.argv[2]) if len(sys.argv) > 2 else 8765
 
     ip = local_ip()
+    tmp_dir = Path(tempfile.gettempdir())
 
     for i in range(MAX_PLAYERS):
         player_num = i + 1
@@ -41,15 +48,15 @@ def main() -> None:
         page_url = f"http://{ip}:{web_port}/controller.html?ws={ws_addr}"
 
         img = qrcode.make(page_url, border=2)
-        out_path = f"/tmp/ds64_qr_p{player_num}.png"
-        img.save(out_path)
+        out_path = tmp_dir / f"ds64_qr_p{player_num}.png"
+        img.save(str(out_path))
         print(f"Player {player_num}: {page_url} -> {out_path}")
 
     # Keep a copy of player 1's QR in web/ for scan.html / manual sharing.
     qrcode.make(
         f"http://{ip}:{web_port}/controller.html?ws=ws://{ip}:{base_ws_port}",
         border=2,
-    ).save("web/qr.png")
+    ).save(str(REPO_ROOT / "web" / "qr.png"))
     print(f"Scan page: http://{ip}:{web_port}/scan.html")
 
 

@@ -1,7 +1,17 @@
+# Installed automatically by play.py (python -m venv .venv + pip install
+# -r requirements.txt) into the project's own virtualenv — never touches
+# the system Python. mediapipe/opencv/websockets/qrcode are used by the
+# embedded GestureController/PhoneController and QR generation; psutil
+# is used by play.py itself for cross-platform process/port management
+# (replacing macOS-only pkill/lsof shell calls).
 opencv-python
 mediapipe==0.10.14
-pyobjc-framework-Quartz
 websockets
-pynput
 numpy
 qrcode
+psutil
+
+# Only needed for play.py's macOS window-sizing workaround (a rendering
+# glitch at unusual window sizes, worked around by resizing to a known
+# good size right after launch — see play.py). Harmless/unused elsewhere.
+pyobjc-framework-Quartz; sys_platform == "darwin"
