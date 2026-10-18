@@ -1,0 +1,3 @@
+[submodule "vendor/melonDS-src"]
+	path = vendor/melonDS-src
+	url = https://github.com/melonDS-emu/melonDS.git

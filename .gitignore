@@ -9,3 +9,7 @@ __pycache__/
 *.srl
 *.sav*
 *.dmg
+
+# melonDS build artifacts (the source itself we keep, as a tracked clone)
+vendor/melonDS-src/build/
+.claude/
