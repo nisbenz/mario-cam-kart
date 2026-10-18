@@ -1,4 +1,0 @@
-[submodule "vendor/melonDS-src"]
-	path = vendor/melonDS-src
-	url = https://github.com/wailbentafat/melonDS.git
-	branch = gesture-integration
