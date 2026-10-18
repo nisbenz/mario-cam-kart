@@ -255,19 +255,59 @@ bindHold('btn-accel', 'accel');
 bindHold('btn-brake', 'brake');
 bindHold('sh-drift', 'drift');
 bindHold('sh-item', 'item');
+setupWheelDrag();
 
-function handleOrientation(e) {
-  const gamma = e.gamma || 0;
-  steer = Math.max(-1, Math.min(1, gamma / 30));
-
+function applySteer(value) {
+  steer = Math.max(-1, Math.min(1, value));
   const wheel = document.getElementById('wheel');
   const needle = document.getElementById('wheel-needle');
   const angle = steer * 55; // visual max rotation
   needle.style.transform = `rotate(${angle}deg)`;
   wheel.classList.toggle('turning', Math.abs(steer) > 0.08);
-
-  document.getElementById('tilt-readout').textContent = 'TILT ' + gamma.toFixed(1) + '°';
   send();
+}
+
+function handleOrientation(e) {
+  const gamma = e.gamma || 0;
+  applySteer(gamma / 30);
+  document.getElementById('tilt-readout').textContent = 'TILT ' + gamma.toFixed(1) + '°';
+}
+
+// Primary steering input: drag the wheel left/right with your thumb.
+// Doesn't depend on any motion-sensor permission (which is flaky across
+// browsers/OSes and often blocked entirely over plain http://), so this
+// always works regardless of what deviceorientation ends up doing.
+function setupWheelDrag() {
+  const wheel = document.getElementById('wheel');
+  let dragging = false;
+
+  const posX = (e) => (e.touches ? e.touches[0].clientX : e.clientX);
+
+  const start = (e) => { e.preventDefault(); dragging = true; move(e); };
+  const move = (e) => {
+    if (!dragging) return;
+    e.preventDefault();
+    const rect = wheel.getBoundingClientRect();
+    const center = rect.left + rect.width / 2;
+    const dx = posX(e) - center;
+    applySteer(dx / (rect.width / 2));
+    document.getElementById('tilt-readout').textContent = 'DRAG ' + steer.toFixed(2);
+  };
+  const end = (e) => {
+    if (!dragging) return;
+    e.preventDefault();
+    dragging = false;
+    applySteer(0);
+    document.getElementById('tilt-readout').textContent = 'DRAG 0.00';
+  };
+
+  wheel.addEventListener('touchstart', start);
+  wheel.addEventListener('touchmove', move);
+  wheel.addEventListener('touchend', end);
+  wheel.addEventListener('touchcancel', end);
+  wheel.addEventListener('mousedown', start);
+  window.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', end);
 }
 
 // A QR code encodes this page's URL with ?ws=<address> baked in, so
@@ -295,20 +335,26 @@ document.getElementById('go').addEventListener('click', async () => {
     return;
   }
 
-  setConnectStatus('requesting motion access…');
-
+  // Tilt steering is a bonus, never a requirement — steering primarily
+  // works by dragging the wheel (see setupWheelDrag), which needs no
+  // permission at all and works the same on iOS/Android/desktop. Motion
+  // sensor permission is flaky across browsers (iOS needs an explicit
+  // grant; Android/Chrome often blocks it entirely over plain http://),
+  // so a denial here must never block connecting.
   if (typeof DeviceOrientationEvent !== 'undefined' &&
       typeof DeviceOrientationEvent.requestPermission === 'function') {
     try {
       const perm = await DeviceOrientationEvent.requestPermission();
-      if (perm !== 'granted') {
-        setConnectStatus('motion permission denied — steering needs it', true);
-        return;
+      if (perm === 'granted') {
+        window.addEventListener('deviceorientation', handleOrientation);
       }
     } catch (err) {
-      setConnectStatus('motion permission error: ' + err, true);
-      return;
+      // ignore — drag steering still works
     }
+  } else if (typeof DeviceOrientationEvent !== 'undefined') {
+    // Android/desktop: no explicit permission API: just listen, and fall
+    // back to drag steering if events never actually fire.
+    window.addEventListener('deviceorientation', handleOrientation);
   }
 
   setConnectStatus('connecting to ' + addr + ' …');
@@ -326,7 +372,6 @@ document.getElementById('go').addEventListener('click', async () => {
     document.getElementById('status-dot').classList.add('live');
     document.getElementById('connect').style.display = 'none';
     document.getElementById('pad').style.display = 'flex';
-    window.addEventListener('deviceorientation', handleOrientation);
     setInterval(send, 50);
   };
   ws.onclose = () => {
