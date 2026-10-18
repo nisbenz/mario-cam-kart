@@ -44,6 +44,7 @@ async def _phone_handler(websocket, player: PlayerConfig) -> None:
             accel=bool(data.get("accel", False)),
             brake=bool(data.get("brake", False)),
             drift=bool(data.get("drift", False)),
+            item=bool(data.get("item", False)),
         )
         _set_intent(player.name, intent)
 
@@ -78,6 +79,8 @@ def _intent_to_keys(player: PlayerConfig, intent: Intent) -> set[str]:
         keys.add(keymap.brake)
     if intent.drift:
         keys.add(keymap.drift)
+    if intent.item:
+        keys.add(keymap.item)
     return keys
 
 

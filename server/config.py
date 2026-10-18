@@ -41,6 +41,8 @@ class PlayerConfig:
 
 
 PLAYERS = [
-    PlayerConfig(name="player1", process_name="melonDS", camera_index=0),
+    # Hand-gesture control for the local player is now built natively into
+    # the melonDS fork itself (vendor/melonDS-src/tools/gesture) — this
+    # bridge is just for phones connecting over the local network.
     PlayerConfig(name="player2", process_name="melonDS", camera_index=None),
 ]

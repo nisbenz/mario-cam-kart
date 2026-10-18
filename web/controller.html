@@ -49,6 +49,7 @@
       <div class="btn" id="btn-brake">BRAKE</div>
     </div>
     <div class="side">
+      <div class="btn" id="btn-item">ITEM</div>
       <div class="btn" id="btn-drift">DRIFT</div>
       <div class="btn" id="btn-accel">ACCEL</div>
     </div>
@@ -57,11 +58,11 @@
 <script>
 let ws = null;
 let steer = 0;
-const state = { accel: false, brake: false, drift: false };
+const state = { accel: false, brake: false, drift: false, item: false };
 
 function send() {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
-  ws.send(JSON.stringify({ steer, accel: state.accel, brake: state.brake, drift: state.drift }));
+  ws.send(JSON.stringify({ steer, accel: state.accel, brake: state.brake, drift: state.drift, item: state.item }));
 }
 
 function bindHold(id, key) {
@@ -78,6 +79,7 @@ function bindHold(id, key) {
 bindHold('btn-accel', 'accel');
 bindHold('btn-brake', 'brake');
 bindHold('btn-drift', 'drift');
+bindHold('btn-item', 'item');
 
 function handleOrientation(e) {
   const gamma = e.gamma || 0;

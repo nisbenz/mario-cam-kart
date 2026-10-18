@@ -14,6 +14,7 @@ class Intent:
     accel: bool
     brake: bool
     drift: bool
+    item: bool = False
 
 
 def _landmark_intent(landmarks) -> Intent:
