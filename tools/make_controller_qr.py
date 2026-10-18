@@ -29,12 +29,13 @@ def main() -> None:
     ws_addr = f"ws://{ip}:{ws_port}/player2"
     page_url = f"http://{ip}:{web_port}/controller.html?ws={ws_addr}"
 
-    img = qrcode.make(page_url)
-    out_path = "controller_qr.png"
+    img = qrcode.make(page_url, border=2)
+    out_path = "web/qr.png"
     img.save(out_path)
 
     print(f"Page URL: {page_url}")
     print(f"Saved QR code to: {out_path}")
+    print(f"Scan page:  http://{ip}:{web_port}/scan.html")
 
 
 if __name__ == "__main__":

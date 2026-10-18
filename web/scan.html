@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DS64</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --bg-grid: #121833;
+    --neon-cyan: #39f5e2;
+    --neon-magenta: #ff3ec8;
+    --neon-yellow: #ffe14d;
+    --panel: #10152a;
+    --panel-border: #2a3566;
+    --text: #d8ddf5;
+    --text-dim: #6c76a8;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    overflow: hidden;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    position: relative;
+    background-image:
+      linear-gradient(var(--bg-grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px);
+    background-size: 42px 42px;
+    background-position: center;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 0%, var(--bg) 78%);
+    pointer-events: none;
+  }
+
+  .scanlines {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.12) 0px,
+      rgba(0, 0, 0, 0.12) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    opacity: 0.35;
+  }
+
+  .brand {
+    font-family: 'Press Start 2P', monospace;
+    font-size: clamp(32px, 8vw, 56px);
+    letter-spacing: 4px;
+    color: var(--neon-cyan);
+    text-shadow:
+      0 0 6px var(--neon-cyan),
+      0 0 24px rgba(57, 245, 226, 0.55),
+      0 0 48px rgba(57, 245, 226, 0.25);
+    position: relative;
+    z-index: 1;
+  }
+
+  .brand span { color: var(--neon-magenta); text-shadow: 0 0 6px var(--neon-magenta), 0 0 24px rgba(255, 62, 200, 0.55); }
+
+  .tagline {
+    font-size: 13px;
+    letter-spacing: 3px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    position: relative;
+    z-index: 1;
+  }
+
+  .qr-panel {
+    background: var(--panel);
+    border: 2px solid var(--panel-border);
+    border-radius: 20px;
+    padding: 24px;
+    position: relative;
+    z-index: 1;
+    box-shadow:
+      0 0 0 1px rgba(57, 245, 226, 0.15),
+      0 0 40px rgba(57, 245, 226, 0.12),
+      inset 0 0 30px rgba(10, 14, 26, 0.6);
+  }
+
+  .qr-panel::before,
+  .qr-panel::after {
+    content: "";
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border: 3px solid var(--neon-yellow);
+  }
+  .qr-panel::before { top: -3px; left: -3px; border-right: none; border-bottom: none; border-top-left-radius: 8px; }
+  .qr-panel::after { bottom: -3px; right: -3px; border-left: none; border-top: none; border-bottom-right-radius: 8px; }
+
+  .qr-panel img {
+    display: block;
+    width: min(46vw, 300px);
+    height: auto;
+    border-radius: 8px;
+    background: #fff;
+    padding: 10px;
+  }
+
+  .hint {
+    font-size: 14px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .hint .key {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    color: var(--neon-yellow);
+  }
+
+  .status-row {
+    display: flex;
+    gap: 18px;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    position: relative;
+    z-index: 1;
+  }
+
+  .status-row .dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--neon-cyan);
+    box-shadow: 0 0 6px var(--neon-cyan);
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+</style>
+</head>
+<body>
+  <div class="scanlines"></div>
+
+  <div class="brand">DS<span>64</span></div>
+  <div class="tagline">Local Link &middot; Player Join</div>
+
+  <div class="qr-panel">
+    <img src="qr.png" alt="Scan to join" />
+  </div>
+
+  <div class="hint"><span class="key">1</span> point phone camera at code &middot; <span class="key">2</span> tap to start</div>
+
+  <div class="status-row">
+    <span><span class="dot"></span>bridge online</span>
+    <span>same Wi-Fi required</span>
+  </div>
+</body>
+</html>
