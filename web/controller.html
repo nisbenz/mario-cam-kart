@@ -2,56 +2,231 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>Kart Controller</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>DS64 Controller</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
+  :root {
+    --bg: #0a0e1a;
+    --neon-cyan: #39f5e2;
+    --neon-magenta: #ff3ec8;
+    --neon-yellow: #ffe14d;
+    --neon-green: #4dff8f;
+    --panel: #10152a;
+    --panel-border: #2a3566;
+    --text: #d8ddf5;
+    --text-dim: #6c76a8;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
   html, body {
     margin: 0;
     height: 100%;
-    background: #111;
-    color: #eee;
-    font-family: -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
     overflow: hidden;
     touch-action: none;
     user-select: none;
   }
-  #status { position: fixed; top: 8px; left: 8px; font-size: 12px; opacity: 0.6; }
+
+  body {
+    background-image:
+      linear-gradient(#121833 1px, transparent 1px),
+      linear-gradient(90deg, #121833 1px, transparent 1px);
+    background-size: 36px 36px;
+  }
+
+  /* ---------- top bar ---------- */
+  #topbar {
+    position: fixed; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    z-index: 5;
+  }
+  #logo {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 13px;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 6px var(--neon-cyan), 0 0 18px rgba(57,245,226,0.5);
+  }
+  #logo span { color: var(--neon-magenta); text-shadow: 0 0 6px var(--neon-magenta), 0 0 18px rgba(255,62,200,0.5); }
+  #status-dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: #555; margin-right: 6px; vertical-align: middle;
+  }
+  #status-dot.live { background: var(--neon-green); box-shadow: 0 0 6px var(--neon-green); }
+
+  /* ---------- connect screen ---------- */
   #connect {
     position: fixed; inset: 0; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 16px;
+    align-items: center; justify-content: center; gap: 22px; z-index: 10;
+    background: var(--bg);
   }
-  #connect input { font-size: 18px; padding: 8px; width: 70%; }
-  #connect button { font-size: 18px; padding: 10px 24px; }
+  #connect-brand {
+    font-family: 'Press Start 2P', monospace;
+    font-size: clamp(28px, 10vw, 40px);
+    color: var(--neon-cyan);
+    text-shadow: 0 0 6px var(--neon-cyan), 0 0 24px rgba(57,245,226,0.5);
+  }
+  #connect-brand span { color: var(--neon-magenta); text-shadow: 0 0 6px var(--neon-magenta), 0 0 24px rgba(255,62,200,0.5); }
+  #connect-label { font-size: 12px; color: var(--text-dim); letter-spacing: 2px; text-transform: uppercase; }
+  #connect-status { font-size: 12px; color: var(--neon-yellow); letter-spacing: 1px; min-height: 16px; text-align: center; }
+  #connect-status.err { color: var(--neon-magenta); }
+  #addr {
+    font-family: 'Space Mono', monospace;
+    font-size: 15px; padding: 10px; width: 78%;
+    background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 8px; color: var(--text); text-align: center;
+  }
+  #go {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 14px; padding: 16px 32px;
+    background: var(--panel); color: var(--neon-yellow);
+    border: 2px solid var(--neon-yellow); border-radius: 12px;
+    box-shadow: 0 0 16px rgba(255,225,77,0.3);
+  }
+  #go:active { background: var(--neon-yellow); color: #10152a; }
+
+  /* ---------- pad ---------- */
   #pad {
     display: none;
     position: fixed; inset: 0;
-    grid-template-columns: 1fr 1fr;
+    flex-direction: column;
+    padding-top: 40px;
   }
-  .side { display: flex; flex-direction: column; justify-content: flex-end; gap: 12px; padding: 16px; }
-  .btn {
-    background: #333; border: 2px solid #555; border-radius: 16px;
-    color: #eee; font-size: 20px; padding: 24px; text-align: center;
+
+  #wheel-zone {
+    flex: 0 0 auto;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 10px 0 4px;
   }
-  .btn.active { background: #4a7; }
-  #tilt-readout { position: fixed; top: 8px; right: 8px; font-size: 12px; opacity: 0.6; }
+  #wheel {
+    width: 108px; height: 108px; border-radius: 50%;
+    border: 3px solid var(--panel-border);
+    position: relative;
+    box-shadow: 0 0 0 1px rgba(57,245,226,0.1), inset 0 0 20px rgba(0,0,0,0.5);
+    background: var(--panel);
+    transition: border-color 0.1s, box-shadow 0.1s;
+  }
+  #wheel.turning { border-color: var(--neon-cyan); box-shadow: 0 0 18px rgba(57,245,226,0.5); }
+  #wheel-needle {
+    position: absolute; top: 50%; left: 50%;
+    width: 4px; height: 42px;
+    background: var(--neon-cyan);
+    box-shadow: 0 0 8px var(--neon-cyan);
+    transform-origin: 50% 100%;
+    margin-left: -2px; margin-top: -42px;
+    border-radius: 2px;
+    transition: transform 0.05s linear;
+  }
+  #wheel-dot {
+    position: absolute; top: 50%; left: 50%; width: 10px; height: 10px;
+    margin: -5px; border-radius: 50%; background: var(--neon-cyan);
+    box-shadow: 0 0 8px var(--neon-cyan);
+  }
+  #tilt-readout { font-size: 11px; color: var(--text-dim); margin-top: 10px; letter-spacing: 1px; }
+
+  /* ---------- shoulder row (DRIFT / ITEM) ---------- */
+  #shoulders {
+    flex: 0 0 auto;
+    display: flex; justify-content: space-between;
+    padding: 6px 18px;
+    gap: 14px;
+  }
+  .shoulder {
+    flex: 1;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 11px;
+    text-align: center;
+    padding: 14px 0;
+    border-radius: 10px;
+    background: var(--panel);
+    border: 2px solid var(--panel-border);
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+  #sh-drift { color: var(--neon-magenta); border-color: rgba(255,62,200,0.4); }
+  #sh-drift.active { background: var(--neon-magenta); color: #10152a; box-shadow: 0 0 20px rgba(255,62,200,0.6); }
+  #sh-item { color: var(--neon-yellow); border-color: rgba(255,225,77,0.4); }
+  #sh-item.active { background: var(--neon-yellow); color: #10152a; box-shadow: 0 0 20px rgba(255,225,77,0.6); }
+
+  /* ---------- face buttons (ACCEL / BRAKE) ---------- */
+  #faces {
+    flex: 1;
+    display: flex; align-items: flex-end; justify-content: space-between;
+    padding: 0 24px 34px;
+  }
+  .face-btn {
+    width: 120px; height: 120px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 13px;
+    border: 3px solid;
+    background: var(--panel);
+    transition: transform 0.05s, box-shadow 0.1s, background 0.1s;
+  }
+  .face-btn:active, .face-btn.active { transform: scale(0.94); }
+
+  #btn-brake {
+    color: var(--neon-magenta);
+    border-color: var(--neon-magenta);
+    box-shadow: 0 0 10px rgba(255,62,200,0.25);
+  }
+  #btn-brake.active {
+    background: var(--neon-magenta); color: #10152a;
+    box-shadow: 0 0 30px rgba(255,62,200,0.8);
+  }
+
+  #btn-accel {
+    color: var(--neon-green);
+    border-color: var(--neon-green);
+    box-shadow: 0 0 10px rgba(77,255,143,0.25);
+  }
+  #btn-accel.active {
+    background: var(--neon-green); color: #10152a;
+    box-shadow: 0 0 30px rgba(77,255,143,0.8);
+  }
 </style>
 </head>
 <body>
+  <div id="topbar">
+    <div id="logo">DS<span>64</span></div>
+    <div><span id="status-dot"></span><span id="status">offline</span></div>
+  </div>
+
   <div id="connect">
+    <div id="connect-brand">DS<span>64</span></div>
     <div id="connect-label">Controller server address</div>
     <input id="addr" placeholder="ws://192.168.1.10:8765/player2" />
     <button id="go">Connect</button>
+    <div id="connect-status"></div>
   </div>
-  <div id="status"></div>
-  <div id="tilt-readout"></div>
-  <div id="pad" style="display:none; grid-template-columns: 1fr 1fr;">
-    <div class="side">
-      <div class="btn" id="btn-brake">BRAKE</div>
+
+  <div id="pad">
+    <div id="wheel-zone">
+      <div id="wheel">
+        <div id="wheel-needle"></div>
+        <div id="wheel-dot"></div>
+      </div>
+      <div id="tilt-readout">TILT 0.0&deg;</div>
     </div>
-    <div class="side">
-      <div class="btn" id="btn-item">ITEM</div>
-      <div class="btn" id="btn-drift">DRIFT</div>
-      <div class="btn" id="btn-accel">ACCEL</div>
+
+    <div id="shoulders">
+      <div class="shoulder" id="sh-drift">L &middot; DRIFT</div>
+      <div class="shoulder" id="sh-item">R &middot; ITEM</div>
+    </div>
+
+    <div id="faces">
+      <div class="face-btn" id="btn-brake">BRAKE</div>
+      <div class="face-btn" id="btn-accel">ACCEL</div>
     </div>
   </div>
 
@@ -78,13 +253,20 @@ function bindHold(id, key) {
 
 bindHold('btn-accel', 'accel');
 bindHold('btn-brake', 'brake');
-bindHold('btn-drift', 'drift');
-bindHold('btn-item', 'item');
+bindHold('sh-drift', 'drift');
+bindHold('sh-item', 'item');
 
 function handleOrientation(e) {
   const gamma = e.gamma || 0;
   steer = Math.max(-1, Math.min(1, gamma / 30));
-  document.getElementById('tilt-readout').textContent = 'tilt ' + gamma.toFixed(1);
+
+  const wheel = document.getElementById('wheel');
+  const needle = document.getElementById('wheel-needle');
+  const angle = steer * 55; // visual max rotation
+  needle.style.transform = `rotate(${angle}deg)`;
+  wheel.classList.toggle('turning', Math.abs(steer) > 0.08);
+
+  document.getElementById('tilt-readout').textContent = 'TILT ' + gamma.toFixed(1) + '°';
   send();
 }
 
@@ -97,37 +279,67 @@ if (qsAddr) {
   document.getElementById('addr').value = qsAddr;
   document.getElementById('addr').style.display = 'none';
   document.getElementById('connect-label').style.display = 'none';
-  document.getElementById('go').textContent = 'Tap to Start';
+  document.getElementById('go').textContent = 'TAP TO START';
+}
+
+function setConnectStatus(msg, isError) {
+  const el = document.getElementById('connect-status');
+  el.textContent = msg;
+  el.classList.toggle('err', !!isError);
 }
 
 document.getElementById('go').addEventListener('click', async () => {
   const addr = document.getElementById('addr').value.trim();
-  if (!addr) return;
+  if (!addr) {
+    setConnectStatus('no server address set', true);
+    return;
+  }
+
+  setConnectStatus('requesting motion access…');
 
   if (typeof DeviceOrientationEvent !== 'undefined' &&
       typeof DeviceOrientationEvent.requestPermission === 'function') {
     try {
       const perm = await DeviceOrientationEvent.requestPermission();
       if (perm !== 'granted') {
-        document.getElementById('status').textContent = 'motion permission denied';
+        setConnectStatus('motion permission denied — steering needs it', true);
         return;
       }
     } catch (err) {
-      document.getElementById('status').textContent = 'motion permission error: ' + err;
+      setConnectStatus('motion permission error: ' + err, true);
       return;
     }
   }
 
+  setConnectStatus('connecting to ' + addr + ' …');
+
   ws = new WebSocket(addr);
+
+  const connectTimeout = setTimeout(() => {
+    setConnectStatus('timed out — is play.sh running on the host?', true);
+    ws.close();
+  }, 6000);
+
   ws.onopen = () => {
+    clearTimeout(connectTimeout);
     document.getElementById('status').textContent = 'connected';
+    document.getElementById('status-dot').classList.add('live');
     document.getElementById('connect').style.display = 'none';
-    document.getElementById('pad').style.display = 'grid';
+    document.getElementById('pad').style.display = 'flex';
     window.addEventListener('deviceorientation', handleOrientation);
     setInterval(send, 50);
   };
-  ws.onclose = () => { document.getElementById('status').textContent = 'disconnected'; };
-  ws.onerror = () => { document.getElementById('status').textContent = 'connection error'; };
+  ws.onclose = () => {
+    clearTimeout(connectTimeout);
+    document.getElementById('status').textContent = 'disconnected';
+    document.getElementById('status-dot').classList.remove('live');
+    document.getElementById('pad').style.display = 'none';
+    document.getElementById('connect').style.display = 'flex';
+    setConnectStatus('disconnected — tap to retry', true);
+  };
+  ws.onerror = () => {
+    setConnectStatus('connection failed — check host is on the same Wi-Fi', true);
+  };
 });
 </script>
 </body>
