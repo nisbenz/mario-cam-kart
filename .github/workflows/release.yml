@@ -1,0 +1,137 @@
+name: Release
+
+# Builds melonDS for Windows/macOS/Linux and publishes them as downloadable
+# assets on a GitHub Release whenever a version tag (v1.0.0 etc.) is pushed.
+# This is what lets someone install DS64 without building from source
+# themselves — see the "Install a prebuilt release" section in README.md.
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  DS64_SRC: vendor/melonDS-src
+
+jobs:
+  build-ubuntu:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install --allow-downgrades cmake ninja-build extra-cmake-modules libpcap0.8-dev libsdl2-dev libenet-dev \
+            qt6-{base,base-private,multimedia}-dev qt6-wayland libqt6svg6-dev libarchive-dev libzstd-dev libfuse2 libfaad-dev \
+            python3-dev python3-venv
+      - name: Configure
+        working-directory: ${{ env.DS64_SRC }}
+        run: cmake -B build -G Ninja -DCMAKE_INSTALL_PREFIX=/usr -DMELONDS_EMBED_BUILD_INFO=ON
+      - name: Build
+        working-directory: ${{ env.DS64_SRC }}
+        run: |
+          cmake --build build
+          DESTDIR=AppDir cmake --install build
+      - name: Fetch AppImage tools
+        working-directory: ${{ env.DS64_SRC }}
+        run: |
+          wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod a+x linuxdeploy-*.AppImage
+      - name: Build the AppImage
+        working-directory: ${{ env.DS64_SRC }}
+        env:
+          EXTRA_PLATFORM_PLUGINS: libqwayland-egl.so;libqwayland-generic.so
+          EXTRA_QT_PLUGINS: waylandcompositor
+          QMAKE: /usr/lib/qt6/bin/qmake
+        run: ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DS64-linux-x86_64
+          path: ${{ env.DS64_SRC }}/melonDS*.AppImage
+
+  build-macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, arm64]
+    runs-on: macos-15
+    env:
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/vcpkg_cache,readwrite
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install autoconf automake autoconf-archive libtool python-setuptools
+      - uses: lukka/get-cmake@latest
+      - uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/vcpkg_cache
+          key: vcpkg-${{ matrix.arch }}-osx-${{ hashFiles(format('{0}/vcpkg.json', env.DS64_SRC)) }}
+          restore-keys: vcpkg-${{ matrix.arch }}-osx-
+      - uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: "${{ env.DS64_SRC }}/vcpkg.json"
+      - name: Configure
+        working-directory: ${{ env.DS64_SRC }}
+        run: >
+          cmake --preset release-mac-${{ matrix.arch }}
+          -DMELONDS_EMBED_BUILD_INFO=ON -DVCPKG_ROOT="$VCPKG_ROOT"
+      - name: Build
+        working-directory: ${{ env.DS64_SRC }}
+        run: cmake --build --preset release-mac-${{ matrix.arch }}
+      - name: Compress app bundle
+        run: |
+          cd ${{ env.DS64_SRC }}/build/release-mac-${{ matrix.arch }}
+          zip -r -y "$GITHUB_WORKSPACE/DS64-macos-${{ matrix.arch }}.zip" melonDS.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DS64-macos-${{ matrix.arch }}
+          path: DS64-macos-${{ matrix.arch }}.zip
+
+  build-windows:
+    runs-on: windows-2025
+    env:
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/vcpkg_cache,readwrite
+    steps:
+      - uses: actions/checkout@v4
+      - uses: lukka/get-cmake@latest
+      - uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/vcpkg_cache
+          key: vcpkg-x86_64-windows-${{ hashFiles(format('{0}/vcpkg.json', env.DS64_SRC)) }}
+          restore-keys: vcpkg-x86_64-windows-
+      - uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: "${{ env.DS64_SRC }}/vcpkg.json"
+      - name: Configure
+        working-directory: ${{ env.DS64_SRC }}
+        shell: pwsh
+        run: >
+          cmake --preset release-windows-x86_64
+          -DENABLE_DEBUG_DEPS=OFF -DMELONDS_EMBED_BUILD_INFO=ON
+          -DVCPKG_ROOT="$env:VCPKG_ROOT"
+      - name: Build
+        working-directory: ${{ env.DS64_SRC }}
+        run: cmake --build --preset release-windows-x86_64
+      - name: Zip binary
+        shell: pwsh
+        run: Compress-Archive -Path "${{ env.DS64_SRC }}\build\release-windows-x86_64\melonDS.exe" -DestinationPath "DS64-windows-x86_64.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DS64-windows-x86_64
+          path: DS64-windows-x86_64.zip
+
+  publish:
+    needs: [build-ubuntu, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Flatten artifact layout
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f \( -name "*.zip" -o -name "*.AppImage" \) -exec cp {} release-assets/ \;
+          ls -la release-assets
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          generate_release_notes: true

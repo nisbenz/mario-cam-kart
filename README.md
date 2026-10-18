@@ -1,82 +1,125 @@
-# mario-cam-kart
+# DS64
 
-Control Mario Kart DS with webcam hand-tracking, on melonDS. Phase 2 adds a
-second camera/phone-controlled player for local co-op across two melonDS
-instances.
+A heavily modified native fork of [melonDS](https://melondsfork.net) that adds
+webcam hand-gesture control and phone-based control for Mario Kart DS,
+including real local multiplayer where each extra player drives their own
+embedded game instance from their phone — all in a single window.
 
-## Phase 1 (today): single player, webcam steering
+- **Camera mode**: tilt your hands like gripping a wheel to steer, make a
+  fist to accelerate, open palm to brake, stick a thumb out to use an item.
+- **Phone mode**: scan a QR code shown right in the emulator window to open a
+  touch controller on your phone (steer by dragging a wheel, holding L/R
+  buttons, or tilting the phone — your choice, picked on connect).
+- **Local multiplayer (2-4 players)**: pick "Phone" and a player count at
+  startup; every extra player's game instance is embedded as its own panel
+  in the same window (not a separate OS window) and connects to the others
+  over melonDS's own local wireless multiplayer emulation — real racing
+  against each other, not shared/split input on one kart.
 
-Uses [`vendor/steering_wheel.py`](vendor/steering_wheel.py), pulled in from
-[zaibutman/Virtual-Steering-Wheel](https://github.com/zaibutman/Virtual-Steering-Wheel).
-It tracks both hands with MediaPipe, treats them like a wheel grip (tilt the
-imaginary wheel left/right to steer), fist = accelerate, open palm = brake,
-and sends plain arrow-key presses via `pynput` to whatever window has OS
-focus — so it only drives one game window at a time.
+No window-focus hacks, no external bridge process — the camera tracking and
+phone WebSocket server both run embedded directly inside melonDS itself.
 
-### Setup
+## Quick start
 
-```bash
-cd /Users/mac/Documents/project/free/mario-cam-kart
-.venv/bin/pip install -r requirements.txt   # venv already created
-```
+1. **Get the ROM.** DS64 does not and will never include a Mario Kart DS ROM
+   — that's Nintendo's copyrighted game. Dump your own cartridge, or obtain
+   one legally, and drop the `.nds` file in the repo root.
+2. **Run the launcher for your OS:**
 
-melonDS is installed at `/Applications/melonDS.app`. It's ad-hoc signed (not
-notarized), so the first launch needs **right-click → Open → "Open Anyway"**
-instead of a normal double-click, or Gatekeeper will refuse to run it.
+   | OS | Command |
+   |---|---|
+   | macOS / Linux | `./play.sh` |
+   | Windows | `play.bat` (double-click, or run from a terminal) |
 
-1. Open melonDS, load your own legally-dumped Mario Kart DS ROM.
-2. In melonDS: Config → Input, bind: Up/Down/Left/Right to arrow keys (should
-   already be default).
-3. Click into the melonDS window so it has focus, then run:
-   ```bash
-   .venv/bin/python vendor/steering_wheel.py
-   ```
-4. Hold both hands up in front of the webcam like gripping a wheel. Tilt to
-   steer, make fists to accelerate, open both palms to brake. Press `q` in
-   the controller's own preview window to stop (releases all keys).
+   That's it — same entrypoint on every platform. The first run will take a
+   while (it builds melonDS from source and sets up a Python virtualenv with
+   the camera/phone dependencies); after that, startup is fast.
+3. melonDS opens with its own **"DS64 Setup"** dialog — pick **Camera** or
+   **Phone**, and if Phone, how many players (1-4).
+4. If you picked Phone: scan the QR code shown in the window with your
+   phone's camera (same Wi-Fi network as this computer), pick a steering
+   style, and play. For 2+ players, each additional player's phone shows its
+   own QR code right inside their panel of the split window.
+5. Press Ctrl+C in the terminal running `play.sh`/`play.bat` to stop
+   everything together, or use the **"⟲ RESTART SETUP"** button drawn in the
+   bottom-left of the game window to go back to the camera/phone picker
+   without closing anything.
 
-Tune constants at the top of `vendor/steering_wheel.py` (`CAMERA_INDEX`,
-`DEAD_ZONE_DEG`, etc.) to taste.
+### What the launcher does for you
 
-## Phase 2 (not yet wired to melonDS): 2-player co-op
+`play.sh` / `play.bat` are thin wrappers that just find (or install) a
+system Python 3, then hand off to `play.py`, which:
 
-The 2-player pieces already exist in `server/` but were built against Azahar
-and need their process target switched to melonDS + validated against a real
-melonDS local-multiplayer session (melonDS has a real `LocalMP` networking
-layer for this, same mechanism as in-game Download Play):
+- Creates a project-local Python virtualenv (`.venv`) and installs
+  everything it needs into it — never touches your system Python.
+- Checks for melonDS's C++ build dependencies (CMake, Qt6, SDL2, etc.) and
+  installs them automatically via Homebrew (macOS) or `apt` (Linux). On
+  Windows, if you don't already have a prebuilt binary and nothing's
+  installed, it prints exact one-time setup steps (MSYS2) instead of
+  attempting a silent multi-gigabyte unattended install — see
+  `vendor/melonDS-src/BUILD.md`.
+- Builds melonDS from source if it isn't already built.
+- Pre-generates the QR codes, launches melonDS, serves the phone controller
+  page, and cleans everything up together when you stop it.
 
-- `server/pose_tracker.py` — MediaPipe Pose-based lean/hands-up intent
-  (alternative to the hand-wheel-grip approach, tracks the whole body).
-- `web/controller.html` — phone page: tilt phone to steer, tap buttons for
-  accel/brake/drift, sent over WebSocket.
-- `server/input_backend.py` — targets a specific process by PID via
-  `CGEventPostToPid` (macOS `Quartz`), which is what makes two simultaneous
-  emulator instances possible — unlike `pynput`, it doesn't depend on OS
-  window focus.
-- `server/app.py` — merges whichever intent source (camera or phone) is live
-  per player and dispatches to that player's backend.
+## Install a prebuilt release (skip building from source)
 
-To bring this online once Phase 1 feels good:
+Building from source the first time can take several minutes (longer on
+Windows). If a [release](../../releases) is available for your platform,
+download it instead:
 
-1. Launch two melonDS instances, start a local multiplayer session between
-   them (melonDS's own Multiplayer menu) so both are in the same Mario Kart
-   DS race.
-2. In `server/config.py`, set `PLAYERS[i].process_name = "melonDS"` for both
-   (already defaulted), `camera_index=0` for a camera player,
-   `camera_index=None` for a phone player.
-3. Grant Accessibility permission (System Settings → Privacy & Security →
-   Accessibility) to whatever runs `server/app.py` — required for
-   `CGEventPostToPid`.
-4. Run `cd server && ../.venv/bin/python app.py`.
-5. For the phone player: `cd web && python3 -m http.server 8080`, then on the
-   phone (same Wi-Fi) open `http://<mac-ip>:8080/controller.html`, connect to
-   `ws://<mac-ip>:8765/player2` (path must match that player's `name`).
+1. Grab the `DS64-<platform>-<arch>` archive from the
+   [Releases page](../../releases) and unzip it.
+2. Place the extracted `melonDS` (Linux AppImage), `melonDS.app` (macOS), or
+   `melonDS.exe` (Windows) at `vendor/melonDS-src/build/` in the matching
+   location `play.py` expects:
+   - macOS: `vendor/melonDS-src/build/melonDS.app`
+   - Linux: `vendor/melonDS-src/build/melonDS` (the AppImage, made executable)
+   - Windows: `vendor/melonDS-src/build/melonDS.exe`
+3. Run `./play.sh` / `play.bat` as usual — since a binary already exists, it
+   skips straight past the build step.
+
+Releases are built by `.github/workflows/release.yml` on every version tag
+(CI also runs the same build on every push to `master`, so build health is
+checked continuously, not just at release time).
+
+## Controls reference
+
+| Action | Camera (gesture) | Phone |
+|---|---|---|
+| Steer | tilt both-hands grip left/right | drag wheel / hold L·R buttons / tilt phone |
+| Accelerate | make a fist | ACCEL button |
+| Brake | open palm | BRAKE button |
+| Use item | stick a thumb out (either hand) | ITEM button (pulsing circle) |
+| Drift / powerslide | — | DRIFT button |
+
+Real keyboard/mouse input always takes priority — pressing any key or
+clicking the screen immediately hands control back to you, and gesture/phone
+control only reclaims it once both hands are visible again (camera) or a
+phone reconnects.
 
 ## Known limitations
 
-- Phase 1 is single-player only by construction (global keyboard focus).
-- Steering is digital, not analog — macOS has no unprivileged virtual-gamepad
-  API (Apple gates a real one behind a manually-approved entitlement).
-- Phase 2's process-to-PID matching is by launch order, not explicit PID —
-  fine for two local instances, fragile if either restarts.
-- Phase 2 hasn't been run end-to-end against melonDS yet.
+- **Windows/Linux are less battle-tested than macOS.** The native dialogs,
+  split-screen embedding, and CI build steps are written correctly against
+  documented platform APIs and melonDS's own `vendor/melonDS-src/BUILD.md`,
+  but macOS is where this has actually been run and played on. If something
+  breaks on your platform, check `.github/workflows/` CI run results first
+  (same build steps you'd hit locally) — and issues/PRs are welcome.
+- Mario Kart DS itself has no split-input mode — each player genuinely needs
+  their own game instance talking to the others over local multiplayer, not
+  one kart driven by multiple people. That's what the multi-phone embedded
+  panels set up automatically.
+- Gesture steering is based on hand tilt angle, not a true analog stick —
+  there's no unprivileged virtual-gamepad API on most desktop OSes.
+
+## Repo layout
+
+- `vendor/melonDS-src/` — the melonDS fork itself (plain tracked files, not
+  a submodule). The DS64-specific additions live mainly in
+  `src/frontend/qt_sdl/` (`GestureController`, `PhoneController`, the DS64
+  Setup dialog, and the single-window split-screen embedding) and
+  `tools/gesture/` / `tools/phone/` (the embedded Python side).
+- `web/controller.html` — the phone controller page.
+- `play.py` / `play.sh` / `play.bat` — the cross-platform launcher.
+- `requirements.txt` — Python dependencies `play.py` installs into `.venv`.
