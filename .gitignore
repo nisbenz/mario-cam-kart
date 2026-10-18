@@ -13,3 +13,6 @@ __pycache__/
 # melonDS build artifacts (the source itself we keep, as a tracked clone)
 vendor/melonDS-src/build/
 .claude/
+
+# Generated locally, bakes in this machine's LAN IP
+controller_qr.png

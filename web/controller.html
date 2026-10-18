@@ -38,7 +38,7 @@
 </head>
 <body>
   <div id="connect">
-    <div>Controller server address</div>
+    <div id="connect-label">Controller server address</div>
     <input id="addr" placeholder="ws://192.168.1.10:8765/player2" />
     <button id="go">Connect</button>
   </div>
@@ -86,6 +86,18 @@ function handleOrientation(e) {
   steer = Math.max(-1, Math.min(1, gamma / 30));
   document.getElementById('tilt-readout').textContent = 'tilt ' + gamma.toFixed(1);
   send();
+}
+
+// A QR code encodes this page's URL with ?ws=<address> baked in, so
+// scanning it skips typing the address entirely — just one tap to grant
+// motion access (iOS requires that tap to come from the user, so true
+// zero-tap auto-connect isn't possible, but this is as close as it gets.
+const qsAddr = new URLSearchParams(location.search).get('ws');
+if (qsAddr) {
+  document.getElementById('addr').value = qsAddr;
+  document.getElementById('addr').style.display = 'none';
+  document.getElementById('connect-label').style.display = 'none';
+  document.getElementById('go').textContent = 'Tap to Start';
 }
 
 document.getElementById('go').addEventListener('click', async () => {

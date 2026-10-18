@@ -4,3 +4,4 @@ pyobjc-framework-Quartz
 websockets
 pynput
 numpy
+qrcode
