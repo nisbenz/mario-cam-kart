@@ -15,4 +15,4 @@ vendor/melonDS-src/build/
 .claude/
 
 # Generated locally, bakes in this machine's LAN IP
-controller_qr.png
+web/qr.png
