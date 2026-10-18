@@ -1,0 +1,78 @@
+name: macOS
+
+on:
+  push:
+    branches:
+      - master
+      - ci/*
+  pull_request:
+    branches:
+      - master
+
+env:
+  MELONDS_GIT_BRANCH: ${{ github.ref }}
+  MELONDS_GIT_HASH: ${{ github.sha }}
+  MELONDS_BUILD_PROVIDER: GitHub Actions
+  DS64_SRC: vendor/melonDS-src
+
+jobs:
+  build-macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, arm64]
+
+    name: ${{ matrix.arch }}
+    runs-on: macos-15
+
+    env:
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/vcpkg_cache,readwrite
+
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+      - name: Install dependencies for package building
+        run: |
+          brew install autoconf automake autoconf-archive libtool python-setuptools
+      - name: Set up CMake
+        uses: lukka/get-cmake@latest
+      - name: Restore vcpkg cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/vcpkg_cache
+          key: vcpkg-${{ matrix.arch }}-osx-${{ hashFiles(format('{0}/vcpkg.json', env.DS64_SRC)) }}
+          restore-keys: vcpkg-${{ matrix.arch }}-osx-
+      - name: Set up vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: "${{ env.DS64_SRC }}/vcpkg.json"
+      # CMakePresets.json must sit in the directory cmake is invoked from
+      # (a lukka/run-cmake limitation, not just this repo's layout —
+      # vcpkg.json's glob-based discovery doesn't have that restriction,
+      # which is why only this step runs cmake directly instead of
+      # through lukka/run-cmake).
+      - name: Configure
+        working-directory: ${{ env.DS64_SRC }}
+        run: >
+          cmake --preset release-mac-${{ matrix.arch }}
+          -DMELONDS_EMBED_BUILD_INFO=ON
+          -DVCPKG_ROOT="$VCPKG_ROOT"
+      - name: Build
+        working-directory: ${{ env.DS64_SRC }}
+        run: cmake --build --preset release-mac-${{ matrix.arch }}
+      - name: Compress app bundle
+        shell: bash
+        run: |
+          cd ${{ env.DS64_SRC }}/build/release-mac-${{ matrix.arch }}
+          zip -r -y "$GITHUB_WORKSPACE/macOS-${{ matrix.arch }}.zip" melonDS.app
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS-${{ matrix.arch }}
+          path: macOS-${{ matrix.arch }}.zip
+          retention-days: 1
+      - name: Save vcpkg cache
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/vcpkg_cache
+          key: vcpkg-${{ matrix.arch }}-osx-${{ hashFiles(format('{0}/vcpkg.json', env.DS64_SRC)) }}

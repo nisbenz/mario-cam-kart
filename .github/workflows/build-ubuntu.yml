@@ -13,7 +13,7 @@ env:
   MELONDS_GIT_BRANCH: ${{ github.ref }}
   MELONDS_GIT_HASH: ${{ github.sha }}
   MELONDS_BUILD_PROVIDER: GitHub Actions
-#  MELONDS_VERSION_SUFFIX: " RC"
+  DS64_SRC: vendor/melonDS-src
 
 jobs:
   build:
@@ -30,37 +30,41 @@ jobs:
     runs-on: ${{ matrix.arch.runner }}
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v4
       name: Check out sources
     - name: Install dependencies
       run: |
         sudo apt update
         sudo apt install --allow-downgrades cmake ninja-build extra-cmake-modules libpcap0.8-dev libsdl2-dev libenet-dev \
-          qt6-{base,base-private,multimedia}-dev qt6-wayland libqt6svg6-dev libarchive-dev libzstd-dev libfuse2 libfaad-dev
+          qt6-{base,base-private,multimedia}-dev qt6-wayland libqt6svg6-dev libarchive-dev libzstd-dev libfuse2 libfaad-dev \
+          python3-dev python3-venv
     - name: Configure
+      working-directory: ${{ env.DS64_SRC }}
       run: cmake -B build -G Ninja -DCMAKE_INSTALL_PREFIX=/usr -DMELONDS_EMBED_BUILD_INFO=ON
     - name: Build
+      working-directory: ${{ env.DS64_SRC }}
       run: |
         cmake --build build
         DESTDIR=AppDir cmake --install build
-    - uses: actions/upload-artifact@v7
+    - uses: actions/upload-artifact@v4
       with:
         name: melonDS-ubuntu-${{ matrix.arch.name }}
-        path: AppDir/usr/bin/melonDS
+        path: ${{ env.DS64_SRC }}/AppDir/usr/bin/melonDS
     - name: Fetch AppImage tools
+      working-directory: ${{ env.DS64_SRC }}
       run: |
         wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${{ matrix.arch.name }}.AppImage
         wget https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-${{ matrix.arch.name }}.AppImage
         chmod a+x linuxdeploy-*.AppImage
     - name: Build the AppImage
+      working-directory: ${{ env.DS64_SRC }}
       env:
         EXTRA_PLATFORM_PLUGINS: libqwayland-egl.so;libqwayland-generic.so
         EXTRA_QT_PLUGINS: waylandcompositor
         QMAKE: /usr/lib/qt6/bin/qmake
       run: |
         ./linuxdeploy-${{ matrix.arch.name }}.AppImage --appdir AppDir --plugin qt --output appimage
-    - uses: actions/upload-artifact@v7
+    - uses: actions/upload-artifact@v4
       with:
         name: melonDS-appimage-${{ matrix.arch.name }}
-        path: melonDS*.AppImage
-        archive: false
+        path: ${{ env.DS64_SRC }}/melonDS*.AppImage
