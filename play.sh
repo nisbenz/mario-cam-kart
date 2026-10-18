@@ -1,8 +1,15 @@
 #!/bin/bash
-# One command, everything up: native melonDS (built-in hand-gesture +
-# keyboard/mouse control) + the phone bridge server + the local web
-# server serving the phone controller / QR scan pages. Ctrl+C here
-# stops all of it together.
+# One command, everything up: native melonDS (built-in hand-gesture,
+# keyboard/mouse, and — for multi-phone local multiplayer — per-instance
+# phone control, all chosen via melonDS's own "DS64 Setup" dialog) + the
+# local web server serving the phone controller page. Ctrl+C here stops
+# all of it together.
+#
+# No external phone bridge process anymore: each melonDS instance that
+# picks phone mode embeds its own WebSocket listener directly (see
+# PhoneController), one per player, ports 8765-8768. Camera-vs-phone and
+# (if phone) player count are both asked by melonDS's own native dialog
+# at startup — not here.
 
 set -e
 cd "$(dirname "$0")"
@@ -10,7 +17,8 @@ cd "$(dirname "$0")"
 MELONDS_BIN="vendor/melonDS-src/build/melonDS.app/Contents/MacOS/melonDS"
 ROM_PATH="$(pwd)/Mario Kart DS (USA) (En,Fr,De,Es,It).nds"
 WEB_PORT=8080
-WS_PORT=8765
+BASE_WS_PORT=8765
+MAX_PLAYERS=4
 
 if [ ! -x "$MELONDS_BIN" ]; then
     echo "[ERROR] Native melonDS build not found at $MELONDS_BIN"
@@ -30,30 +38,38 @@ kill_port() {
 
 echo "[INFO] Stopping any leftover melonDS / server processes..."
 pkill -9 -x melonDS 2>/dev/null || true
-kill_port "$WS_PORT"
 kill_port "$WEB_PORT"
+for i in $(seq 0 $((MAX_PLAYERS - 1))); do
+    kill_port $((BASE_WS_PORT + i))
+done
 sleep 1
 
-PHONE_PID=""
 WEB_PID=""
 
 cleanup() {
     echo ""
     echo "[INFO] Shutting down everything..."
-    [ -n "$PHONE_PID" ] && kill "$PHONE_PID" 2>/dev/null || true
     [ -n "$WEB_PID" ] && kill "$WEB_PID" 2>/dev/null || true
-    kill_port "$WS_PORT"
     kill_port "$WEB_PORT"
+    for i in $(seq 0 $((MAX_PLAYERS - 1))); do
+        kill_port $((BASE_WS_PORT + i))
+    done
     pkill -9 -x melonDS 2>/dev/null || true
     exit 0
 }
 trap cleanup INT TERM
 
+LOCAL_IP="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)"
+
+echo "[INFO] Pre-generating QR codes for up to $MAX_PLAYERS players..."
+.venv/bin/python tools/make_controller_qr.py "$WEB_PORT" "$BASE_WS_PORT"
+
 echo "[INFO] Launching melonDS..."
 "$MELONDS_BIN" -b auto "$ROM_PATH" > /tmp/melonds_play.log 2>&1 &
 MELON_PID=$!
 
-for _ in $(seq 1 20); do
+echo "[INFO] Waiting for the DS64 Setup dialog to be answered..."
+for _ in $(seq 1 600); do
     pgrep -x melonDS > /dev/null && break
     sleep 0.5
 done
@@ -87,7 +103,7 @@ def run_osascript(script):
     subprocess.run(["osascript", "-e", script], capture_output=True)
 
 
-for _ in range(20):
+for _ in range(600):  # the DS64 Setup dialog(s) block the window until answered
     if get_bounds() is not None:
         break
     time.sleep(0.5)
@@ -120,41 +136,23 @@ else:
     print(f"[WARN] could not perfectly set window bounds, using current: {get_bounds()}")
 PYEOF
 
-echo "[INFO] Starting phone bridge server (port $WS_PORT)..."
-(cd server && ../.venv/bin/python app.py > /tmp/phone_server.log 2>&1) &
-PHONE_PID=$!
-
 echo "[INFO] Starting local web server (port $WEB_PORT)..."
 (cd web && python3 -m http.server "$WEB_PORT" > /tmp/web_server.log 2>&1) &
 WEB_PID=$!
 
 sleep 1
-if ! kill -0 "$PHONE_PID" 2>/dev/null; then
-    echo "[ERROR] Phone bridge server failed to start. Check /tmp/phone_server.log"
-    cat /tmp/phone_server.log
-    cleanup
-fi
 if ! kill -0 "$WEB_PID" 2>/dev/null; then
     echo "[ERROR] Web server failed to start. Check /tmp/web_server.log"
     cat /tmp/web_server.log
     cleanup
 fi
 
-echo "[INFO] Generating QR code..."
-.venv/bin/python tools/make_controller_qr.py "$WEB_PORT" "$WS_PORT"
-
-LOCAL_IP="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)"
-SCAN_URL="http://$LOCAL_IP:$WEB_PORT/scan.html"
-
-echo "[INFO] Opening scan page: $SCAN_URL"
-open "$SCAN_URL"
-
 echo ""
 echo "======================================================="
 echo " Everything is running:"
-echo "   - melonDS (hand-gesture + keyboard/mouse control)"
-echo "   - Phone bridge server  -> ws://$LOCAL_IP:$WS_PORT/player2"
-echo "   - Scan page            -> $SCAN_URL"
+echo "   - melonDS (camera or phone chosen at its own startup dialog)"
+echo "   - If phone mode: each player's QR shown right in their window"
+echo "   - Controller page served at http://$LOCAL_IP:$WEB_PORT/controller.html"
 echo "======================================================="
 echo " Press Ctrl+C here to stop everything together."
 echo "======================================================="
