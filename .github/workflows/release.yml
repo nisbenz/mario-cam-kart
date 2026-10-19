@@ -11,6 +11,12 @@ on:
 
 env:
   DS64_SRC: vendor/melonDS-src
+  # Required whenever -DMELONDS_EMBED_BUILD_INFO=ON is passed (every
+  # build job below) — src/CMakeLists.txt hard-errors if any of these
+  # three are empty.
+  MELONDS_GIT_BRANCH: ${{ github.ref }}
+  MELONDS_GIT_HASH: ${{ github.sha }}
+  MELONDS_BUILD_PROVIDER: GitHub Actions
 
 jobs:
   build-ubuntu:
