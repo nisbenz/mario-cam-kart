@@ -6,6 +6,12 @@ name: Release
 # so it runs without a separate .nds file. This is what lets someone install
 # DS64 without building from source themselves — see the "Install a prebuilt
 # release" section in README.md.
+#
+# Test builds: a tag with a "-" in it (v0.2.0-test1, v1.0.0-rc1, ...) makes a
+# *draft* release instead — visible only to the repo's collaborators, not
+# public, no notifications — so the binaries can be downloaded straight from
+# the release page and tried before cutting a real tag. Delete the draft and
+# the tag afterwards.
 on:
   push:
     tags:
@@ -196,3 +202,5 @@ jobs:
           files: release-assets/*
           body_path: missing.md
           generate_release_notes: true
+          draft: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(github.ref_name, '-') }}

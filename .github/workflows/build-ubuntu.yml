@@ -9,6 +9,12 @@ on:
     branches:
       - master
 
+# A newer push to the same branch/PR supersedes the running build, instead
+# of two identical runs competing for runners and the vcpkg cache.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   MELONDS_GIT_BRANCH: ${{ github.ref }}
   MELONDS_GIT_HASH: ${{ github.sha }}

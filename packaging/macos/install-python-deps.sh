@@ -37,6 +37,9 @@ if [ "$ARCH" = "x86_64" ]; then
         --only-binary=:all:
         --platform macosx_10_15_x86_64
         --platform macosx_11_0_x86_64
+        # That old OpenCV is compiled against NumPy 1.x; with NumPy 2 its
+        # import fails ("_ARRAY_API not found").
+        "numpy<2"
     )
 fi
 
