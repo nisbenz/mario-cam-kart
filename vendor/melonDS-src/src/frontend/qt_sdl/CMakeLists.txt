@@ -276,7 +276,8 @@ if (APPLE)
         endif()
         add_custom_command(TARGET melonDS POST_BUILD
             COMMAND ${CMAKE_SOURCE_DIR}/tools/mac-libs.rb ${DMGARG} ${CMAKE_BINARY_DIR}
-            COMMENT "Bundling macOS libraries...")
+            COMMENT "Bundling macOS libraries..."
+            VERBATIM)
     endif()
 endif()
 
