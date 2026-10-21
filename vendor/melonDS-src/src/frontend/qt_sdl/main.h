@@ -74,6 +74,11 @@ extern int g_DS64TotalPlayers;
 // through) can boot the same game into itself directly via its own
 // EmuThread. See EmuInstance.cpp.
 extern QStringList g_DS64ROMPath;
+// A DS64 venv path (scripts use DS64_TOOLS_DIR, see EmuInstance.cpp): the DS64_* environment variable envVar when set
+// (play.py always sets it), else the path compiled in by CMake. Release
+// binaries are built on CI, so their compiled-in source-tree paths don't
+// exist on the player's machine — the runtime value must win.
+QString ds64Path(const char* envVar, const char* builtIn);
 
 void broadcastInstanceCommand(int cmd, QVariant& param, int sourceinst);
 
