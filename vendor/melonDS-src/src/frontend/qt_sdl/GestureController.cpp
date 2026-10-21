@@ -114,7 +114,9 @@ void GestureController::WorkerLoop()
         // version) instead of requiring a separate global install.
 #ifdef GESTURE_VENV_SITE_PACKAGES
         PyObject* venvDir = PyUnicode_FromString(GESTURE_VENV_SITE_PACKAGES);
-        PyList_Append(sysPath, venvDir);
+        // Insert first so the venv's versions win over any older copies in
+        // the system dist-packages or ~/.local (e.g. Debian's websockets).
+        PyList_Insert(sysPath, 0, venvDir);
         Py_DECREF(venvDir);
 #endif
     }
