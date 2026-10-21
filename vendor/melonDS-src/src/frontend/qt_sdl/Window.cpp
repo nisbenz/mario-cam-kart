@@ -1989,6 +1989,10 @@ void MainWindow::onMPNewInstance()
 
 void MainWindow::onDS64Setup()
 {
+    // This process is about to hard-exit, so release the controller page port
+    // explicitly — the freshly started instance needs to bind it.
+    ds64StopBundledServices();
+
     QString exe = QCoreApplication::applicationFilePath();
     // Inside an AppImage, applicationFilePath() points into the AppImage's
     // temporary mount, which disappears as soon as this process exits —

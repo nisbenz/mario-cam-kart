@@ -16,4 +16,5 @@ opencv-contrib-python
 # DS64's own scripts
 websockets
 qrcode
+pillow   # qrcode.make_image() needs an image backend for the QR PNGs
 psutil   # tools/lan_ip.py enumerates network interfaces for the QR address

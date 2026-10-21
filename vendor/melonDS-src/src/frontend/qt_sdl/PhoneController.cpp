@@ -87,6 +87,11 @@ void PhoneController::WorkerLoop()
     // this controller — EmuThread only reads the mutex-protected
     // snapshot — so one GIL acquisition for the whole thread lifetime is
     // correct and avoids per-iteration Ensure()/Release() overhead.
+    if (ds64PythonInitializationFailed())
+    {
+        qWarning() << "PhoneController: Python runtime is unavailable";
+        return;
+    }
     if (!Py_IsInitialized())
         Py_InitializeEx(0);
     PyGILState_STATE gstate = PyGILState_Ensure();

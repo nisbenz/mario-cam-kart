@@ -13,6 +13,7 @@ mediapipe==0.10.14; python_version < "3.13"
 websockets
 numpy
 qrcode
+pillow   # qrcode.make_image() needs an image backend for the QR PNGs
 psutil
 
 # Only needed for play.py's macOS window-sizing workaround (a rendering

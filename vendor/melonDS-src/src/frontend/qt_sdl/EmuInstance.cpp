@@ -294,6 +294,11 @@ EmuInstance::EmuInstance(int inst) : deleting(false),
                 playerCount = PromptPlayerCount();
             g_DS64TotalPlayers = playerCount;
 
+            // Phone mode is the only mode that needs the bundled runtime:
+            // generate the QR overlays and start serving controller.html
+            // before createWindow() looks for the QR files below.
+            ds64StartBundledServices();
+
             // Split-screen (playerCount > 1): every instance's panel is
             // embedded into instance 0's single window (see
             // MainWindow::addMultiplayerPanel), which only works with

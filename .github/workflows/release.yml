@@ -2,8 +2,10 @@ name: Release
 
 # Builds melonDS for Windows/macOS/Linux and publishes them as downloadable
 # assets on a GitHub Release whenever a version tag (v1.0.0 etc.) is pushed.
-# This is what lets someone install DS64 without building from source
-# themselves — see the "Install a prebuilt release" section in README.md.
+# Each binary has the repo's Mario Kart DS ROM compiled in (DS64_EMBED_ROM),
+# so it runs without a separate .nds file. This is what lets someone install
+# DS64 without building from source themselves — see the "Install a prebuilt
+# release" section in README.md.
 on:
   push:
     tags:
@@ -57,6 +59,13 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install Python dependencies for the bundle
+        run: |
+          ./packaging/macos/install-python-deps.sh \
+            "${{ matrix.arch }}" \
+            "${{ steps.setup-python.outputs.python-path }}" \
+            "$GITHUB_WORKSPACE" \
+            "$RUNNER_TEMP/ds64-site-packages"
       - uses: actions/cache/restore@v4
         with:
           path: ${{ github.workspace }}/vcpkg_cache
@@ -69,11 +78,18 @@ jobs:
         working-directory: ${{ env.DS64_SRC }}
         run: >
           cmake --preset release-mac-${{ matrix.arch }}
-          -DMELONDS_EMBED_BUILD_INFO=ON -DVCPKG_ROOT="$VCPKG_ROOT"
+          -DMELONDS_EMBED_BUILD_INFO=ON -DDS64_EMBED_ROM=ON -DVCPKG_ROOT="$VCPKG_ROOT"
           -DPython3_EXECUTABLE="${{ steps.setup-python.outputs.python-path }}"
       - name: Build
         working-directory: ${{ env.DS64_SRC }}
         run: cmake --build --preset release-mac-${{ matrix.arch }}
+      - name: Assemble standalone app bundle
+        run: |
+          ./packaging/macos/make-bundle.sh \
+            "${{ env.DS64_SRC }}/build/release-mac-${{ matrix.arch }}/melonDS.app" \
+            "$GITHUB_WORKSPACE" \
+            "${{ steps.setup-python.outputs.python-path }}" \
+            "$RUNNER_TEMP/ds64-site-packages"
       - name: Compress app bundle
         run: |
           cd ${{ env.DS64_SRC }}/build/release-mac-${{ matrix.arch }}
@@ -90,6 +106,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: lukka/get-cmake@latest
+      - name: Set up Python
+        id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - uses: actions/cache/restore@v4
         with:
           path: ${{ github.workspace }}/vcpkg_cache
@@ -104,13 +125,21 @@ jobs:
         run: >
           cmake --preset release-windows-x86_64
           -DENABLE_DEBUG_DEPS=OFF -DMELONDS_EMBED_BUILD_INFO=ON
+          -DDS64_EMBED_ROM=ON
           -DVCPKG_ROOT="$env:VCPKG_ROOT"
+          -DPython3_EXECUTABLE="${{ steps.setup-python.outputs.python-path }}"
       - name: Build
         working-directory: ${{ env.DS64_SRC }}
         run: cmake --build --preset release-windows-x86_64
-      - name: Zip binary
+      - name: Package standalone bundle
         shell: pwsh
-        run: Compress-Archive -Path "${{ env.DS64_SRC }}\build\release-windows-x86_64\melonDS.exe" -DestinationPath "DS64-windows-x86_64.zip"
+        run: |
+          ./packaging/windows/make-bundle.ps1 `
+            -Binary "${{ env.DS64_SRC }}\build\release-windows-x86_64\melonDS.exe" `
+            -Python "${{ steps.setup-python.outputs.python-path }}" `
+            -RepoRoot "${{ github.workspace }}" `
+            -OutDir "${{ github.workspace }}\DS64-windows-x86_64"
+          Compress-Archive -Path "DS64-windows-x86_64" -DestinationPath "DS64-windows-x86_64.zip"
       - uses: actions/upload-artifact@v4
         with:
           name: DS64-windows-x86_64

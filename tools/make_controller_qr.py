@@ -14,6 +14,7 @@ OS-specific path like "/tmp" (which doesn't exist on Windows).
 Usage: python tools/make_controller_qr.py [web_port] [base_ws_port]
 """
 
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -48,16 +49,18 @@ def main() -> None:
         print(f"Player {player_num}: {page_url} -> {out_path}")
 
     # Keep a copy of player 1's QR in web/ for scan.html / manual sharing.
-    # Skipped when web/ is read-only (e.g. inside the AppImage) — melonDS
-    # only needs the per-player copies above.
-    try:
-        qrcode.make(
-            f"http://{ip}:{web_port}/controller.html?ws=ws://{ip}:{base_ws_port}",
-            border=2,
-        ).save(str(REPO_ROOT / "web" / "qr.png"))
-        print(f"Scan page: http://{ip}:{web_port}/scan.html")
-    except OSError:
-        pass
+    # Release bundles are signed/read-only and serving the page does not need
+    # this file, so only write it for source/play.py runs. The per-player
+    # copies above (in the temp dir) are what the in-game overlay loads.
+    if not os.environ.get("DS64_BUNDLE_DIR"):
+        try:
+            qrcode.make(
+                f"http://{ip}:{web_port}/controller.html?ws=ws://{ip}:{base_ws_port}",
+                border=2,
+            ).save(str(REPO_ROOT / "web" / "qr.png"))
+            print(f"Scan page: http://{ip}:{web_port}/scan.html")
+        except OSError:
+            pass
 
 
 if __name__ == "__main__":

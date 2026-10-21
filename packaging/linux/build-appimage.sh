@@ -2,7 +2,11 @@
 # Builds a fully self-contained DS64 AppImage: melonDS + Qt + a relocatable
 # Python 3.12 (python-build-standalone) with every requirements.txt package
 # bundled, so it runs on any x86_64 Linux with glibc >= 2.35 and needs
-# nothing else installed. No ROM is included.
+# nothing else installed.
+#
+# The Mario Kart DS ROM is compiled into the melonDS executable itself (see
+# DS64_EMBED_ROM in vendor/melonDS-src/src/frontend/qt_sdl/CMakeLists.txt),
+# so the AppImage needs no separate .nds file next to it.
 #
 # Meant to run inside an ubuntu:22.04 container (the old-ish glibc is what
 # makes the result portable). From the repo root:
@@ -12,12 +16,10 @@
 #       -v "$HOME/.cache/ds64-appimage":/cache ubuntu:22.04 \
 #       bash /src/packaging/linux/build-appimage.sh
 #
-# The AppImage lands in ./dist/.
-#
-# Personal build: additionally mount your own ROM with
-#   -v /path/to/game.nds:/rom.nds:ro
-# and it's baked in (output: DS64-x86_64-personal.AppImage) so the game
-# boots straight away. Never publish that file — the ROM is copyrighted. The /cache mount is optional: it keeps
+# The AppImage lands in ./dist/. The ROM at the repo root is embedded
+# automatically; set DS64_EMBED_ROM_FILE=/path/to/game.nds to override it,
+# or mount one at /rom.nds for a "personal" build (output:
+# DS64-x86_64-personal.AppImage). The /cache mount is optional: it keeps
 # downloads and the compiled melonDS between runs, so a retry after a
 # network failure resumes instead of starting over.
 set -euo pipefail
@@ -81,6 +83,26 @@ cd "$WORK/melonDS-src"
 # lib paths on its own, so hand them over explicitly.
 EXTRA_CMAKE_ARGS=()
 [ -n "${MELONDS_GIT_HASH:-}" ] && EXTRA_CMAKE_ARGS+=(-DMELONDS_EMBED_BUILD_INFO=ON)
+
+# Put the ROM inside the executable, not in AppDir, so the resulting
+# AppImage is a single self-contained file. Precedence: an explicit
+# DS64_EMBED_ROM_FILE, a /rom.nds mount (personal build), then the ROM
+# committed at the repo root.
+EMBED_ROM_PATH="${DS64_EMBED_ROM_FILE:-}"
+if [ -z "$EMBED_ROM_PATH" ] && [ -f /rom.nds ]; then
+    EMBED_ROM_PATH=/rom.nds
+fi
+if [ -z "$EMBED_ROM_PATH" ]; then
+    EMBED_ROM_PATH="$(find "$SRC" -maxdepth 1 -type f -iname '*.nds' -print -quit)"
+fi
+if [ -n "$EMBED_ROM_PATH" ]; then
+    echo "==> Embedding ROM $EMBED_ROM_PATH"
+    EXTRA_CMAKE_ARGS+=(-DDS64_EMBED_ROM=ON -DDS64_EMBED_ROM_FILE="$EMBED_ROM_PATH")
+else
+    # Don't inherit a stale ON/path from a previous cached configure.
+    EXTRA_CMAKE_ARGS+=(-DDS64_EMBED_ROM=OFF -DDS64_EMBED_ROM_FILE=)
+fi
+
 cmake -S . -B "$BUILD" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
     -DPython3_EXECUTABLE="$PYROOT/bin/python$PY_VERSION" \
     -DPython3_INCLUDE_DIR="$PYROOT/include/python$PY_VERSION" \
@@ -140,9 +162,6 @@ find AppDir/usr/share/ds64 -name __pycache__ -prune -exec rm -rf {} +
 
 OUT_NAME=DS64-x86_64.AppImage
 if [ -f /rom.nds ]; then
-    echo "==> Baking in the ROM (personal build — do not distribute)"
-    mkdir -p AppDir/usr/share/ds64/rom
-    cp /rom.nds AppDir/usr/share/ds64/rom/game.nds
     OUT_NAME=DS64-x86_64-personal.AppImage
 fi
 

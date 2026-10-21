@@ -24,6 +24,7 @@
 #include <QApplication>
 #include <QEvent>
 #include <QElapsedTimer>
+#include <QStringList>
 
 #include "EmuInstance.h"
 #include "Window.h"
@@ -79,6 +80,22 @@ extern QStringList g_DS64ROMPath;
 // binaries are built on CI, so their compiled-in source-tree paths don't
 // exist on the player's machine — the runtime value must win.
 QString ds64Path(const char* envVar, const char* builtIn);
+
+// Starts the bundled-runtime services (QR generation and the phone controller
+// HTTP server). Called once phone mode has been selected, so camera/keyboard
+// sessions never initialize Python or open a listening socket.
+void ds64StartBundledServices();
+
+// Stops the bundled-runtime services (the phone controller HTTP server)
+// before a hard _Exit when "RESTART SETUP" replaces this process. Also called
+// on normal Qt shutdown; safe to call more than once.
+void ds64StopBundledServices();
+
+// Runs a bundled Python script with the embedded interpreter. pythonHome may
+// be empty to let Python's own environment (AppImage's PYTHONHOME) decide.
+bool ds64RunPythonScript(const QString& scriptPath, const QStringList& args,
+                         const QString& pythonHome, const QString& sitePackages);
+bool ds64PythonInitializationFailed();
 
 void broadcastInstanceCommand(int cmd, QVariant& param, int sourceinst);
 
