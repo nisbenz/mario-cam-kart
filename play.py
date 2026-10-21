@@ -400,12 +400,11 @@ def main() -> None:
     melon_log = open(melon_log_path, "w", encoding="utf-8", errors="replace")
     # Tell the embedded Python where this checkout's scripts and venv
     # actually are — a prebuilt release binary only knows the CI runner's
-    # paths (see ds64Path() in melonDS's main.cpp). We're running under
+    # paths (see DS64ScriptDir()/ds64Path() in melonDS). We're running under
     # the venv's interpreter by now, so purelib is its site-packages.
     melon_env = dict(
         os.environ,
-        DS64_PHONE_SCRIPT_DIR=str(MELONDS_SRC / "tools" / "phone"),
-        DS64_GESTURE_SCRIPT_DIR=str(MELONDS_SRC / "tools" / "gesture"),
+        DS64_TOOLS_DIR=str(MELONDS_SRC / "tools"),
         DS64_VENV_SITE_PACKAGES=sysconfig.get_paths()["purelib"],
     )
     melon_proc = subprocess.Popen([str(binary), "-b", "auto", str(rom_path)],

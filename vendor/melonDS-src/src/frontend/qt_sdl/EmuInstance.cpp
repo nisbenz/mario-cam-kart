@@ -81,6 +81,18 @@ namespace
 // Player 1's phone listens on this port, player 2 on +1, etc.
 constexpr int kDS64BasePhonePort = 8765;
 
+// Where the embedded-Python scripts live. Dev builds use the source tree
+// path baked in at compile time; packaged builds (the AppImage's AppRun)
+// set DS64_TOOLS_DIR to the bundled copy, since the build-time path
+// doesn't exist on the user's machine.
+static QString DS64ScriptDir(const char* sub, const char* compiledPath)
+{
+    QString toolsDir = qEnvironmentVariable("DS64_TOOLS_DIR");
+    if (!toolsDir.isEmpty())
+        return toolsDir + "/" + sub;
+    return QString(compiledPath);
+}
+
 // Native DS64 startup picker: asks whether Player 1 drives via webcam hand
 // gestures or a phone (scan a QR code, shown as an in-window overlay — see
 // Window.cpp's qrOverlay). Shown once, before anything else starts, so the
@@ -273,7 +285,7 @@ EmuInstance::EmuInstance(int inst) : deleting(false),
         {
             g_DS64TotalPlayers = 1;
             gestureController = new GestureController();
-            gestureController->Prepare(ds64Path("DS64_GESTURE_SCRIPT_DIR", GESTURE_SCRIPT_DIR));
+            gestureController->Prepare(DS64ScriptDir("gesture", GESTURE_SCRIPT_DIR));
         }
         else
         {
@@ -294,7 +306,7 @@ EmuInstance::EmuInstance(int inst) : deleting(false),
 
             // This instance (id 0) is player 1.
             phoneController = new PhoneController();
-            phoneController->Prepare(ds64Path("DS64_PHONE_SCRIPT_DIR", PHONE_SCRIPT_DIR), kDS64BasePhonePort + 0);
+            phoneController->Prepare(DS64ScriptDir("phone", PHONE_SCRIPT_DIR), kDS64BasePhonePort + 0);
 
             // Queue up the remaining players as new instances — but not
             // synchronously, right here: creating another EmuInstance
@@ -337,7 +349,7 @@ EmuInstance::EmuInstance(int inst) : deleting(false),
         int myPort = g_DS64PendingPhonePort;
         g_DS64PendingPhonePort = 0; // consume before any nested creation
         phoneController = new PhoneController();
-        phoneController->Prepare(ds64Path("DS64_PHONE_SCRIPT_DIR", PHONE_SCRIPT_DIR), myPort);
+        phoneController->Prepare(DS64ScriptDir("phone", PHONE_SCRIPT_DIR), myPort);
     }
 
     net.RegisterInstance(instanceID);
