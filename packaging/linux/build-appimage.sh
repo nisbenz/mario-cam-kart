@@ -134,7 +134,7 @@ find AppDir/usr/lib/python$PY_VERSION -name __pycache__ -prune -exec rm -rf {} +
 echo "==> Adding DS64 scripts and controller page"
 mkdir -p AppDir/usr/share/ds64/tools
 cp -a "$SRC/vendor/melonDS-src/tools/gesture" "$SRC/vendor/melonDS-src/tools/phone" AppDir/usr/share/ds64/tools/
-cp -a "$SRC/tools/make_controller_qr.py" AppDir/usr/share/ds64/
+cp -a "$SRC/tools/make_controller_qr.py" "$SRC/tools/lan_ip.py" AppDir/usr/share/ds64/
 cp -a "$SRC/web" AppDir/usr/share/ds64/web
 find AppDir/usr/share/ds64 -name __pycache__ -prune -exec rm -rf {} +
 

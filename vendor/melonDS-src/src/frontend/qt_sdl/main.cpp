@@ -79,6 +79,12 @@ int g_DS64PendingPhonePort = 0;
 int g_DS64TotalPlayers = 1;
 QStringList g_DS64ROMPath;
 
+QString ds64Path(const char* envVar, const char* builtIn)
+{
+    QString fromEnv = qEnvironmentVariable(envVar);
+    return fromEnv.isEmpty() ? QString(builtIn) : fromEnv;
+}
+
 CameraManager* camManager[2];
 bool camStarted[2];
 

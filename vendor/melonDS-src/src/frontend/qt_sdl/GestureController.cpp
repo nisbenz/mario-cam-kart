@@ -5,6 +5,7 @@
 #include <Python.h>
 
 #include "GestureController.h"
+#include "main.h"
 #include "EmuInstance.h"
 
 #include <QDebug>
@@ -113,7 +114,8 @@ void GestureController::WorkerLoop()
         // embed — reuse the project's venv (built against the same Python
         // version) instead of requiring a separate global install.
 #ifdef GESTURE_VENV_SITE_PACKAGES
-        PyObject* venvDir = PyUnicode_FromString(GESTURE_VENV_SITE_PACKAGES);
+        QByteArray venvSite = ds64Path("DS64_VENV_SITE_PACKAGES", GESTURE_VENV_SITE_PACKAGES).toUtf8();
+        PyObject* venvDir = PyUnicode_FromString(venvSite.constData());
         // Insert first so the venv's versions win over any older copies in
         // the system dist-packages or ~/.local (e.g. Debian's websockets).
         PyList_Insert(sysPath, 0, venvDir);

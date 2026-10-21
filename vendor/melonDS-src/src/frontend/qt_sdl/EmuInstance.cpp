@@ -393,6 +393,22 @@ EmuInstance::EmuInstance(int inst) : deleting(false),
 
 EmuInstance::~EmuInstance()
 {
+    // DS64 split-screen: every other player's panel lives inside this
+    // (instance 0's) window, and their EmuThreads draw into those panels
+    // every frame. Tearing this window down first freed the panels under
+    // still-running threads — a segfault in drawScreen() that melonDS's
+    // own SIGSEGV handler swallowed, leaving quit hung forever in
+    // emuExit(). Stop the other players before touching our window.
+    if (instanceID == 0)
+    {
+        for (int i = 1; i < g_DS64TotalPlayers; i++)
+        {
+            EmuInstance* other = getEmuInstanceByID(i);
+            if (other && other->embeddedPanel)
+                deleteEmuInstance(i);
+        }
+    }
+
     deleting = true;
     deleteAllWindows();
 
@@ -400,6 +416,15 @@ EmuInstance::~EmuInstance()
     emuThread->wait();
     delete emuThread;
     emuThread = nullptr;
+
+    // Our thread is stopped, so nothing draws into the panel any more —
+    // remove it from the host window's grid rather than leaving it there
+    // pointing at this (about to be freed) instance.
+    if (embeddedPanel)
+    {
+        delete embeddedPanel;
+        embeddedPanel = nullptr;
+    }
 
     net.UnregisterInstance(instanceID);
 

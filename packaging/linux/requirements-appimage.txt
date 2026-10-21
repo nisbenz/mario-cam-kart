@@ -16,3 +16,4 @@ opencv-contrib-python
 # DS64's own scripts
 websockets
 qrcode
+psutil   # tools/lan_ip.py enumerates network interfaces for the QR address
