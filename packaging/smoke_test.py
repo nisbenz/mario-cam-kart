@@ -76,13 +76,16 @@ def layout(target: Path, scratch: Path):
         exe = target / "Contents/MacOS/melonDS"
         share = target / "Contents/Resources/ds64"
         home = target / "Contents/Frameworks/Python.framework/Versions/Current"
-        pyexe = next(iter(sorted((home / "bin").glob("python3.*"))), home / "bin/python3")
-        # Run the bundled interpreter with the executable's architecture, so
-        # an x86_64 bundle is checked under Rosetta on an arm64 runner.
+        # The bundle ships no standalone interpreter (melonDS embeds the
+        # dylib), so check its stdlib, extension modules and wheels with the
+        # runner's own Python 3.x pointed at it via PYTHONHOME. The bundled
+        # dylib itself is exercised by the launch check (QR script and
+        # websockets run inside melonDS). Run with the executable's
+        # architecture, so an x86_64 bundle is checked under Rosetta.
         arch = subprocess.run(["lipo", "-archs", str(exe)], capture_output=True,
                               text=True).stdout.split()
         prefix = ["arch", "-x86_64"] if arch == ["x86_64"] else []
-        py = prefix + [str(pyexe)]
+        py = prefix + [sys.executable]
         py_env = {"PYTHONHOME": str(home), "PYTHONNOUSERSITE": "1"}
         extra = [share / "site-packages"]
         return prefix + [str(exe)], py, py_env, [share, share / "tools/gesture", share / "tools/phone"], extra

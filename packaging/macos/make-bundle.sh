@@ -72,14 +72,15 @@ install_name_tool -id "$NEW_ID" "$FW_BIN"
 # so everything works there — and breaks on a player's Mac without Python.
 # Rewrite those references to @loader_path-relative ones.
 DEST_VERSION="$DEST_FRAMEWORK/Versions/$PY_VERSION"
-# The framework's GUI launcher app; melonDS never uses it.
-rm -rf "$DEST_VERSION/Resources/Python.app"
+# melonDS embeds the Python dylib directly, so the framework's command-line
+# interpreters are dead weight: bin/python3.x is only a stub that re-execs
+# Resources/Python.app, and neither is ever launched.
+rm -rf "$DEST_VERSION/Resources/Python.app" "$DEST_VERSION/bin"
 ABS_DEP_RE="^/.*/Python\.framework/Versions/$PY_VERSION/"
 relpath() { "$PYTHON" -c 'import os, sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))' "$1" "$2"; }
-# Every Mach-O file in the bundled framework: extension modules, bundled
-# dylibs, and bin/python3.x (the smoke test runs that against the copy).
+# Every Mach-O file in the bundled framework: extension modules and dylibs.
 list_macho() {
-    find "$DEST_VERSION" -type f \( -name '*.so' -o -name '*.dylib' -o -path '*/bin/*' \) -print0 |
+    find "$DEST_VERSION" -type f \( -name '*.so' -o -name '*.dylib' \) -print0 |
     while IFS= read -r -d '' F; do
         if file -b "$F" | grep -q 'Mach-O'; then echo "$F"; fi
     done
