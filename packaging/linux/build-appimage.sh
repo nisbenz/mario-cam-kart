@@ -121,8 +121,13 @@ if [ -d /prebuilt-site-packages ]; then
 else
     PYTHONHOME="$WORK/AppDir/usr" AppDir/usr/bin/python3 -m pip --version >/dev/null 2>&1 \
         || PYTHONHOME="$WORK/AppDir/usr" AppDir/usr/bin/python3 -m ensurepip -q
-    PYTHONHOME="$WORK/AppDir/usr" AppDir/usr/bin/python3 -m pip install -q --cache-dir "$CACHE/pip" \
-        --retries 20 --timeout 30 --disable-pip-version-check -r "$SRC/requirements.txt"
+    PIP=(env PYTHONHOME="$WORK/AppDir/usr" AppDir/usr/bin/python3 -m pip install -q --cache-dir "$CACHE/pip"
+         --retries 20 --timeout 30 --disable-pip-version-check)
+    # mediapipe without its declared deps, then only the ones it really
+    # needs — see requirements-appimage.txt. Same mediapipe pin as
+    # requirements.txt.
+    "${PIP[@]}" --no-deps "$(grep -E '^mediapipe' "$SRC/requirements.txt")"
+    "${PIP[@]}" -r "$SRC/packaging/linux/requirements-appimage.txt"
 fi
 find AppDir/usr/lib/python$PY_VERSION -name __pycache__ -prune -exec rm -rf {} +
 
