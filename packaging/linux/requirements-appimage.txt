@@ -10,8 +10,11 @@ protobuf>=4.25.3,<5
 matplotlib   # imported unconditionally by mediapipe.solutions.drawing_utils
 numpy
 # The OpenCV build mediapipe itself depends on; provides cv2 for the
-# gesture script too, so opencv-python isn't needed alongside it.
-opencv-contrib-python
+# gesture script too, so opencv-python isn't needed alongside it. The
+# headless variant: DS64 only captures and draws on frames (no cv2.imshow),
+# and the GUI build needs the host's GTK/glib (libgthread-2.0.so.0) and
+# ships a second Qt that can clash with melonDS's.
+opencv-contrib-python-headless
 
 # DS64's own scripts
 websockets

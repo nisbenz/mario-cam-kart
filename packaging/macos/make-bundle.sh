@@ -42,8 +42,21 @@ fi
 
 echo "==> Bundling Python.framework ($PY_VERSION)"
 rm -rf "$DEST_FRAMEWORK"
-mkdir -p "$APP/Contents/Frameworks"
-cp -a "$SOURCE_FRAMEWORK" "$DEST_FRAMEWORK"
+mkdir -p "$DEST_FRAMEWORK/Versions"
+# Only the version melonDS was linked against. The runner's framework can
+# hold several (3.11, 3.12, 3.13...), and melonDS picks the first
+# Versions/* entry with a lib/ as its Python home — an extra version could
+# pair the 3.12 dylib with another version's stdlib.
+cp -a "$SOURCE_FRAMEWORK/Versions/$PY_VERSION" "$DEST_FRAMEWORK/Versions/"
+ln -s "$PY_VERSION" "$DEST_FRAMEWORK/Versions/Current"
+for LINK in Python Resources Headers; do
+    if [ -e "$DEST_FRAMEWORK/Versions/Current/$LINK" ]; then
+        ln -s "Versions/Current/$LINK" "$DEST_FRAMEWORK/$LINK"
+    fi
+done
+# Not needed at runtime; mirrors the slimming the AppImage/Windows builds do.
+STDLIB="$DEST_FRAMEWORK/Versions/$PY_VERSION/lib/python$PY_VERSION"
+rm -rf "$STDLIB/test" "$STDLIB/idlelib" "$STDLIB/turtledemo" "$STDLIB/ensurepip"
 
 FW_BIN="$DEST_FRAMEWORK/Versions/$PY_VERSION/Python"
 NEW_ID="@rpath/Python.framework/Versions/$PY_VERSION/Python"
@@ -52,6 +65,57 @@ if [ ! -f "$FW_BIN" ]; then
     exit 1
 fi
 install_name_tool -id "$NEW_ID" "$FW_BIN"
+
+# python.org's framework links some of its own extension modules (e.g.
+# _ssl -> lib/libssl.3.dylib, which websockets needs) by absolute path under
+# /Library/Frameworks/Python.framework. That path exists on the CI runner,
+# so everything works there — and breaks on a player's Mac without Python.
+# Rewrite those references to @loader_path-relative ones.
+DEST_VERSION="$DEST_FRAMEWORK/Versions/$PY_VERSION"
+# The framework's GUI launcher app; melonDS never uses it.
+rm -rf "$DEST_VERSION/Resources/Python.app"
+ABS_DEP_RE="^/.*/Python\.framework/Versions/$PY_VERSION/"
+relpath() { "$PYTHON" -c 'import os, sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))' "$1" "$2"; }
+# Every Mach-O file in the bundled framework: extension modules, bundled
+# dylibs, and bin/python3.x (the smoke test runs that against the copy).
+list_macho() {
+    find "$DEST_VERSION" -type f \( -name '*.so' -o -name '*.dylib' -o -path '*/bin/*' \) -print0 |
+    while IFS= read -r -d '' F; do
+        if file -b "$F" | grep -q 'Mach-O'; then echo "$F"; fi
+    done
+}
+while IFS= read -r MACHO; do
+    CHANGED=0
+    for DEP in $(otool -L "$MACHO" | awk 'NR > 1 {print $1}' | { grep -E "$ABS_DEP_RE" || true; }); do
+        TARGET="$DEST_VERSION/${DEP#*/Python.framework/Versions/$PY_VERSION/}"
+        NEW_DEP="@loader_path/$(relpath "$TARGET" "$(dirname "$MACHO")")"
+        install_name_tool -change "$DEP" "$NEW_DEP" "$MACHO" 2>/dev/null
+        CHANGED=1
+    done
+    # The bundled dylibs' own ids, so nothing re-resolves to the old path.
+    if [[ "$MACHO" == *.dylib ]] && otool -D "$MACHO" | tail -n +2 | grep -qE "$ABS_DEP_RE"; then
+        install_name_tool -id "@loader_path/$(basename "$MACHO")" "$MACHO" 2>/dev/null
+        CHANGED=1
+    fi
+    # Editing load commands breaks python.org's signature, and Apple
+    # Silicon refuses to load a Mach-O with an invalid one. The final
+    # `codesign --deep` below doesn't reach loose files under lib/.
+    if [ "$CHANGED" = 1 ]; then
+        codesign --force --sign - "$MACHO" >/dev/null 2>&1
+    fi
+done < <(list_macho)
+codesign --force --sign - "$FW_BIN" >/dev/null 2>&1
+
+LEFTOVER=""
+while IFS= read -r MACHO; do
+    BAD="$(otool -L "$MACHO" | awk 'NR > 1 {print $1}' | { grep -E '^/.*/Python\.framework/' || true; })"
+    if [ -n "$BAD" ]; then LEFTOVER+="$MACHO -> $BAD"$'\n'; fi
+done < <(list_macho; echo "$FW_BIN")
+if [ -n "$LEFTOVER" ]; then
+    echo "error: bundled Python still references an absolute framework path:" >&2
+    echo "$LEFTOVER" >&2
+    exit 1
+fi
 
 # Point the executable at the copy inside the app, and let @rpath resolve to
 # Contents/Frameworks.

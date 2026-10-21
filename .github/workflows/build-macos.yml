@@ -89,6 +89,10 @@ jobs:
             "$GITHUB_WORKSPACE" \
             "${{ steps.setup-python.outputs.python-path }}" \
             "$RUNNER_TEMP/ds64-site-packages"
+      - name: Smoke-test the app bundle
+        run: >
+          "${{ steps.setup-python.outputs.python-path }}" packaging/smoke_test.py
+          "${{ env.DS64_SRC }}/build/release-mac-${{ matrix.arch }}/melonDS.app"
       - name: Compress app bundle
         shell: bash
         run: |

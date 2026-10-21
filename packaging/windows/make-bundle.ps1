@@ -20,6 +20,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# "Stop" doesn't cover native programs, so every pip/python call below
+# checks $LASTEXITCODE: a failing pip would otherwise leave a bundle without
+# mediapipe/OpenCV and still "succeed".
 
 if (Test-Path $OutDir) {
     Remove-Item -Path $OutDir -Recurse -Force
@@ -37,9 +40,12 @@ Copy-Item -Path $Binary -Destination (Join-Path $OutDir "melonDS.exe")
 $RuntimeRequirements = Join-Path $RepoRoot "packaging\linux\requirements-appimage.txt"
 Write-Host "==> Installing Python dependencies into the bundled runtime"
 & $Python -m pip install --disable-pip-version-check --no-input -q --no-deps "mediapipe==0.10.14"
+if ($LASTEXITCODE -ne 0) { throw "pip install mediapipe failed ($LASTEXITCODE)" }
 & $Python -m pip install --disable-pip-version-check --no-input -q -r $RuntimeRequirements
+if ($LASTEXITCODE -ne 0) { throw "pip install -r $RuntimeRequirements failed ($LASTEXITCODE)" }
 
 $PythonHome = & $Python -c "import sys; print(sys.base_prefix)"
+if ($LASTEXITCODE -ne 0 -or -not $PythonHome) { throw "could not query the Python prefix" }
 Write-Host "==> Copying Python runtime from $PythonHome"
 $PythonOut = Join-Path $OutDir "python"
 New-Item -ItemType Directory -Path $PythonOut | Out-Null

@@ -72,6 +72,8 @@ jobs:
           -Python "${{ steps.setup-python.outputs.python-path }}" `
           -RepoRoot "${{ github.workspace }}" `
           -OutDir "${{ github.workspace }}\DS64-windows-${{ matrix.arch.name }}"
+        & "${{ steps.setup-python.outputs.python-path }}" packaging/smoke_test.py "${{ github.workspace }}\DS64-windows-${{ matrix.arch.name }}"
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         Compress-Archive -Path "DS64-windows-${{ matrix.arch.name }}" -DestinationPath "DS64-windows-${{ matrix.arch.name }}.zip"
     - uses: actions/upload-artifact@v4
       with:

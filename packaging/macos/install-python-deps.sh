@@ -24,6 +24,8 @@ PIP_COMMON=(
     -q
     --target "$TARGET"
 )
+# Expanded below as ${PLATFORM_ARGS[@]+...}: macOS's /bin/bash is 3.2, where
+# "${arr[@]}" on an empty array is an unbound-variable error under set -u.
 PLATFORM_ARGS=()
 
 if [ "$ARCH" = "x86_64" ]; then
@@ -42,9 +44,9 @@ fi
 # sounddevice dependency tree, then only the packages the embedded gesture
 # and phone scripts actually import. This also avoids installing both
 # opencv-python and mediapipe's opencv-contrib-python over the same cv2 files.
-"$PYTHON" -m pip install "${PIP_COMMON[@]}" "${PLATFORM_ARGS[@]}" \
+"$PYTHON" -m pip install "${PIP_COMMON[@]}" ${PLATFORM_ARGS[@]+"${PLATFORM_ARGS[@]}"} \
     --no-deps "mediapipe==0.10.14"
-"$PYTHON" -m pip install "${PIP_COMMON[@]}" "${PLATFORM_ARGS[@]}" \
+"$PYTHON" -m pip install "${PIP_COMMON[@]}" ${PLATFORM_ARGS[@]+"${PLATFORM_ARGS[@]}"} \
     -r "$REPO_ROOT/packaging/linux/requirements-appimage.txt"
 
 echo "==> Installed Python packages for $ARCH into $TARGET"

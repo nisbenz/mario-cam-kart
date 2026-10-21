@@ -233,7 +233,9 @@ void pathInit()
 #else
         QString confdir;
         QDir config(QStandardPaths::writableLocation(QStandardPaths::ConfigLocation));
-        config.mkdir("melonDS");
+        // mkpath, not mkdir: on a fresh account ~/.config itself may not
+        // exist yet, and then Config::Load() fails with a modal error.
+        config.mkpath("melonDS");
         confdir = config.absolutePath() + QDir::separator() + "melonDS";
         emuDirectory = confdir;
 #endif
@@ -333,6 +335,9 @@ static void ds64ConfigureBundledRuntime()
     pythonHomeCandidates << g_ds64BundleDir + "/python";
 #ifdef Q_OS_MAC
     QDir frameworksDir(QCoreApplication::applicationDirPath() + "/../Frameworks/Python.framework/Versions");
+    // Current is the version the bundle was built for (make-bundle.sh);
+    // the rest are only a fallback.
+    pythonHomeCandidates << frameworksDir.filePath("Current");
     for (const QString& version : frameworksDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot))
         pythonHomeCandidates << frameworksDir.filePath(version);
 #endif

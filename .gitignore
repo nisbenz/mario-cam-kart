@@ -22,3 +22,7 @@ web/qr.png
 
 # AppImage build output (packaging/linux/build-appimage.sh)
 dist/
+
+# Downloaded CI artifacts / zipped ROM dumps dropped at the repo root
+/*.zip
+/*.AppImage

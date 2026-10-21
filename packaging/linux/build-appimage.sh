@@ -1,8 +1,9 @@
 #!/bin/bash
 # Builds a fully self-contained DS64 AppImage: melonDS + Qt + a relocatable
 # Python 3.12 (python-build-standalone) with every requirements.txt package
-# bundled, so it runs on any x86_64 Linux with glibc >= 2.35 and needs
-# nothing else installed.
+# bundled, so it runs on any Linux with glibc >= 2.35 and needs nothing
+# else installed. Builds for the container's own architecture (x86_64, or
+# aarch64 on an arm64 host/runner).
 #
 # The Mario Kart DS ROM is compiled into the melonDS executable itself (see
 # DS64_EMBED_ROM in vendor/melonDS-src/src/frontend/qt_sdl/CMakeLists.txt),
@@ -19,7 +20,7 @@
 # The AppImage lands in ./dist/. The ROM at the repo root is embedded
 # automatically; set DS64_EMBED_ROM_FILE=/path/to/game.nds to override it,
 # or mount one at /rom.nds for a "personal" build (output:
-# DS64-x86_64-personal.AppImage). The /cache mount is optional: it keeps
+# DS64-<arch>-personal.AppImage). The /cache mount is optional: it keeps
 # downloads and the compiled melonDS between runs, so a retry after a
 # network failure resumes instead of starting over.
 set -euo pipefail
@@ -29,6 +30,7 @@ OUT=/out
 WORK=/work
 CACHE=/cache
 PY_VERSION=3.12
+ARCH="$(uname -m)"   # x86_64 / aarch64, as the AppImage tooling names them
 export DEBIAN_FRONTEND=noninteractive
 export APPIMAGE_EXTRACT_AND_RUN=1   # no FUSE inside containers
 
@@ -113,18 +115,18 @@ DESTDIR="$WORK/AppDir" cmake --install "$BUILD" >/dev/null
 
 echo "==> Deploying Qt and system libraries"
 cd "$WORK"
-fetch https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage "$CACHE/tools/linuxdeploy-x86_64.AppImage"
-fetch https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage "$CACHE/tools/linuxdeploy-plugin-qt-x86_64.AppImage"
-fetch https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage "$CACHE/tools/appimagetool-x86_64.AppImage"
+fetch https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-$ARCH.AppImage "$CACHE/tools/linuxdeploy-$ARCH.AppImage"
+fetch https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-$ARCH.AppImage "$CACHE/tools/linuxdeploy-plugin-qt-$ARCH.AppImage"
+fetch https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$ARCH.AppImage "$CACHE/tools/appimagetool-$ARCH.AppImage"
 # appimagetool would otherwise download this itself at pack time.
-fetch https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64 "$CACHE/tools/runtime-x86_64"
-cp "$CACHE"/tools/*.AppImage .   # run from a copy; the cache stays pristine
+fetch https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-$ARCH "$CACHE/tools/runtime-$ARCH"
+cp "$CACHE"/tools/*-"$ARCH".AppImage .   # run from a copy; the cache stays pristine
 chmod +x ./*.AppImage
 LD_LIBRARY_PATH="$PYROOT/lib" \
 QMAKE=/usr/lib/qt6/bin/qmake \
 EXTRA_PLATFORM_PLUGINS="libqwayland-egl.so;libqwayland-generic.so" \
 EXTRA_QT_PLUGINS="waylandcompositor" \
-    ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt \
+    ./linuxdeploy-$ARCH.AppImage --appdir AppDir --plugin qt \
     --custom-apprun "$SRC/packaging/linux/AppRun" >/dev/null
 
 # Python goes in after linuxdeploy so it never rewrites the RPATHs of the
@@ -160,15 +162,15 @@ cp -a "$SRC/tools/make_controller_qr.py" "$SRC/tools/lan_ip.py" AppDir/usr/share
 cp -a "$SRC/web" AppDir/usr/share/ds64/web
 find AppDir/usr/share/ds64 -name __pycache__ -prune -exec rm -rf {} +
 
-OUT_NAME=DS64-x86_64.AppImage
+OUT_NAME=DS64-$ARCH.AppImage
 if [ -f /rom.nds ]; then
-    OUT_NAME=DS64-x86_64-personal.AppImage
+    OUT_NAME=DS64-$ARCH-personal.AppImage
 fi
 
 echo "==> Packing the AppImage"
 mkdir -p "$OUT"
-ARCH=x86_64 ./appimagetool-x86_64.AppImage --no-appstream \
-    --runtime-file "$CACHE/tools/runtime-x86_64" AppDir "$OUT/$OUT_NAME" >/dev/null
+ARCH="$ARCH" ./appimagetool-$ARCH.AppImage --no-appstream \
+    --runtime-file "$CACHE/tools/runtime-$ARCH" AppDir "$OUT/$OUT_NAME" >/dev/null
 chmod +x "$OUT/$OUT_NAME"
 chown "${HOST_UID:-0}:${HOST_GID:-0}" "$OUT/$OUT_NAME"
 ls -lh "$OUT/$OUT_NAME"

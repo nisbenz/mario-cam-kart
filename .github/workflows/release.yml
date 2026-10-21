@@ -34,6 +34,11 @@ jobs:
             -e MELONDS_GIT_BRANCH -e MELONDS_GIT_HASH -e MELONDS_BUILD_PROVIDER \
             -v "$PWD":/src:ro -v "$PWD/dist":/out -v "$HOME/.cache/ds64-appimage":/cache ubuntu:22.04 \
             bash /src/packaging/linux/build-appimage.sh
+      - name: Smoke-test the AppImage
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libfuse2 libegl1 libxkbcommon-x11-0 libxcb-cursor0 >/dev/null
+          python3 packaging/smoke_test.py dist/DS64-x86_64.AppImage
       - uses: actions/upload-artifact@v4
         with:
           name: DS64-linux-x86_64
@@ -90,6 +95,10 @@ jobs:
             "$GITHUB_WORKSPACE" \
             "${{ steps.setup-python.outputs.python-path }}" \
             "$RUNNER_TEMP/ds64-site-packages"
+      - name: Smoke-test the app bundle
+        run: >
+          "${{ steps.setup-python.outputs.python-path }}" packaging/smoke_test.py
+          "${{ env.DS64_SRC }}/build/release-mac-${{ matrix.arch }}/melonDS.app"
       - name: Compress app bundle
         run: |
           cd ${{ env.DS64_SRC }}/build/release-mac-${{ matrix.arch }}
@@ -139,6 +148,8 @@ jobs:
             -Python "${{ steps.setup-python.outputs.python-path }}" `
             -RepoRoot "${{ github.workspace }}" `
             -OutDir "${{ github.workspace }}\DS64-windows-x86_64"
+          & "${{ steps.setup-python.outputs.python-path }}" packaging/smoke_test.py "${{ github.workspace }}\DS64-windows-x86_64"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Compress-Archive -Path "DS64-windows-x86_64" -DestinationPath "DS64-windows-x86_64.zip"
       - uses: actions/upload-artifact@v4
         with:
@@ -147,6 +158,10 @@ jobs:
 
   publish:
     needs: [build-ubuntu, build-macos, build-windows]
+    # Each OS package is self-contained, so one platform failing must not
+    # hold back the others: publish whatever built and passed its smoke
+    # test. The release notes list any platform that is missing.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     # The default GITHUB_TOKEN is read-only unless a job explicitly asks
     # for more — without this, softprops/action-gh-release fails with
@@ -163,7 +178,18 @@ jobs:
           mkdir -p release-assets
           find artifacts -type f \( -name "*.zip" -o -name "*.AppImage" \) -exec cp {} release-assets/ \;
           ls -la release-assets
+          if [ -z "$(ls -A release-assets)" ]; then
+            echo "::error::No platform built successfully; nothing to publish."
+            exit 1
+          fi
+          {
+            for asset in DS64-x86_64.AppImage DS64-macos-x86_64.zip DS64-macos-arm64.zip DS64-windows-x86_64.zip; do
+              [ -f "release-assets/$asset" ] || echo "- ⚠️ \`$asset\` failed to build for this release."
+            done
+          } > missing.md
+          cat missing.md
       - uses: softprops/action-gh-release@v2
         with:
           files: release-assets/*
+          body_path: missing.md
           generate_release_notes: true
