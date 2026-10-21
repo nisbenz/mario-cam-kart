@@ -53,11 +53,16 @@ def main() -> None:
         print(f"Player {player_num}: {page_url} -> {out_path}")
 
     # Keep a copy of player 1's QR in web/ for scan.html / manual sharing.
-    qrcode.make(
-        f"http://{ip}:{web_port}/controller.html?ws=ws://{ip}:{base_ws_port}",
-        border=2,
-    ).save(str(REPO_ROOT / "web" / "qr.png"))
-    print(f"Scan page: http://{ip}:{web_port}/scan.html")
+    # Skipped when web/ is read-only (e.g. inside the AppImage) — melonDS
+    # only needs the per-player copies above.
+    try:
+        qrcode.make(
+            f"http://{ip}:{web_port}/controller.html?ws=ws://{ip}:{base_ws_port}",
+            border=2,
+        ).save(str(REPO_ROOT / "web" / "qr.png"))
+        print(f"Scan page: http://{ip}:{web_port}/scan.html")
+    except OSError:
+        pass
 
 
 if __name__ == "__main__":
