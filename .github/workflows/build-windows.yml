@@ -58,6 +58,7 @@ jobs:
       run: >
         cmake --preset release-windows-${{ matrix.arch.name }}
         -DENABLE_DEBUG_DEPS=OFF -DMELONDS_EMBED_BUILD_INFO=ON
+        -DUSE_CCACHE=OFF
         -DDS64_EMBED_ROM=ON
         -DVCPKG_ROOT="$env:VCPKG_ROOT"
         -DPython3_EXECUTABLE="${{ steps.setup-python.outputs.python-path }}"
