@@ -1,0 +1,62 @@
+#!/bin/bash
+# DS64 AppImage entrypoint — the packaged equivalent of play.sh/play.py:
+# points the embedded Python at the bundled runtime, generates the phone
+# QR codes, serves the controller page, runs melonDS, and stops the web
+# server again when melonDS exits. Public builds carry no ROM — load one
+# from inside melonDS (File > Open ROM); personal builds boot their own.
+
+HERE="$(dirname "$(readlink -f "$0")")"
+DS64_SHARE="$HERE/usr/share/ds64"
+WEB_PORT=8080
+BASE_WS_PORT=8765
+
+# Bundled Python (python-build-standalone) — never the host's.
+export PYTHONHOME="$HERE/usr"
+export PYTHONNOUSERSITE=1
+unset PYTHONPATH
+export DS64_TOOLS_DIR="$DS64_SHARE/tools"
+export LD_LIBRARY_PATH="$HERE/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+PY="$HERE/usr/bin/python3"
+
+log() { echo "[DS64] $*" >&2; }
+
+# QR codes for each player's phone (written to the temp dir, where
+# melonDS's window loads them from). Needs a network route to work out
+# this machine's LAN IP; phone mode just shows no QR if that fails.
+"$PY" "$DS64_SHARE/make_controller_qr.py" "$WEB_PORT" "$BASE_WS_PORT" >/dev/null 2>&1 \
+    || log "Could not generate QR codes (no network?) — phone mode QR will be missing."
+
+# Phone controller page. Retried briefly because on "RESTART SETUP" the
+# previous instance may still be releasing the port.
+WEB_PID=""
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+    "$PY" -m http.server "$WEB_PORT" --directory "$DS64_SHARE/web" >/dev/null 2>&1 &
+    WEB_PID=$!
+    sleep 0.3
+    kill -0 "$WEB_PID" 2>/dev/null && break
+    WEB_PID=""
+    sleep 0.5
+done
+[ -z "$WEB_PID" ] && log "Could not start the controller web server on port $WEB_PORT."
+
+cleanup() { [ -n "$WEB_PID" ] && kill "$WEB_PID" 2>/dev/null; }
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+
+# Any arguments (a ROM path, or melonDS's own "RESTART SETUP" relaunching
+# us with its previous arguments) are passed straight through. Otherwise a
+# personal build (built with a ROM baked in) boots that ROM. It's run from
+# a writable copy, because melonDS writes the save file next to the ROM
+# and the AppImage itself is read-only.
+if [ $# -eq 0 ]; then
+    BUNDLED_ROM="$(find "$DS64_SHARE/rom" -maxdepth 1 -type f -iname '*.nds' 2>/dev/null | head -n 1)"
+    if [ -n "$BUNDLED_ROM" ]; then
+        DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/ds64"
+        ROM="$DATA_DIR/$(basename "$BUNDLED_ROM")"
+        if ! cmp -s "$BUNDLED_ROM" "$ROM"; then
+            mkdir -p "$DATA_DIR" && cp "$BUNDLED_ROM" "$ROM"
+        fi
+        set -- -b auto "$ROM"
+    fi
+fi
+"$HERE/usr/bin/melonDS" "$@"
