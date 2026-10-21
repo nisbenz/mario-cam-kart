@@ -48,11 +48,17 @@ def main() -> None:
         print(f"Player {player_num}: {page_url} -> {out_path}")
 
     # Keep a copy of player 1's QR in web/ for scan.html / manual sharing.
-    qrcode.make(
-        f"http://{ip}:{web_port}/controller.html?ws=ws://{ip}:{base_ws_port}",
-        border=2,
-    ).save(str(REPO_ROOT / "web" / "qr.png"))
-    print(f"Scan page: http://{ip}:{web_port}/scan.html")
+    # Optional: inside the AppImage web/ is read-only (and not at this
+    # path), and failing here used to make AppRun report that QR
+    # generation failed even though every player's code above was written.
+    try:
+        qrcode.make(
+            f"http://{ip}:{web_port}/controller.html?ws=ws://{ip}:{base_ws_port}",
+            border=2,
+        ).save(str(REPO_ROOT / "web" / "qr.png"))
+        print(f"Scan page: http://{ip}:{web_port}/scan.html")
+    except OSError:
+        pass
 
 
 if __name__ == "__main__":
