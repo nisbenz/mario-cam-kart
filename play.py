@@ -77,12 +77,22 @@ def ensure_venv() -> None:
         log("Creating Python virtualenv (.venv)...")
         subprocess.run([sys.executable, "-m", "venv", str(VENV_DIR)], check=True)
 
+    # Skip pip entirely when requirements.txt is unchanged since the last
+    # successful install — otherwise every launch needs network access and
+    # stalls for minutes in pip's retry backoff when offline.
+    requirements = REPO_ROOT / "requirements.txt"
+    stamp = VENV_DIR / ".requirements-installed"
+    if stamp.exists() and stamp.read_bytes() == requirements.read_bytes():
+        log("Python dependencies up to date.")
+        return
+
     log("Installing/updating Python dependencies into .venv...")
     subprocess.run([str(venv_python()), "-m", "pip", "install", "-q", "--upgrade", "pip"], check=True)
     subprocess.run(
-        [str(venv_python()), "-m", "pip", "install", "-q", "-r", str(REPO_ROOT / "requirements.txt")],
+        [str(venv_python()), "-m", "pip", "install", "-q", "-r", str(requirements)],
         check=True,
     )
+    stamp.write_bytes(requirements.read_bytes())
 
     has_mediapipe = subprocess.run(
         [str(venv_python()), "-c", "import importlib.util, sys; sys.exit(importlib.util.find_spec('mediapipe') is None)"],

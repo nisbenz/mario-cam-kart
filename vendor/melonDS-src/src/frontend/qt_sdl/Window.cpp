@@ -1990,6 +1990,12 @@ void MainWindow::onMPNewInstance()
 void MainWindow::onDS64Setup()
 {
     QString exe = QCoreApplication::applicationFilePath();
+    // Inside an AppImage, applicationFilePath() points into the AppImage's
+    // temporary mount, which disappears as soon as this process exits —
+    // relaunch the .AppImage file itself instead (its runtime sets APPIMAGE).
+    QString appImage = qEnvironmentVariable("APPIMAGE");
+    if (!appImage.isEmpty())
+        exe = appImage;
     QStringList args = QCoreApplication::arguments();
     if (!args.isEmpty())
         args.removeFirst(); // drop argv[0] (the exe path itself)

@@ -16,3 +16,6 @@ vendor/melonDS-src/build/
 
 # Generated locally, bakes in this machine's LAN IP
 web/qr.png
+
+# AppImage build output (packaging/linux/build-appimage.sh)
+dist/

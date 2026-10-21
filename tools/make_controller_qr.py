@@ -48,9 +48,8 @@ def main() -> None:
         print(f"Player {player_num}: {page_url} -> {out_path}")
 
     # Keep a copy of player 1's QR in web/ for scan.html / manual sharing.
-    # Optional: inside the AppImage web/ is read-only (and not at this
-    # path), and failing here used to make AppRun report that QR
-    # generation failed even though every player's code above was written.
+    # Skipped when web/ is read-only (e.g. inside the AppImage) — melonDS
+    # only needs the per-player copies above.
     try:
         qrcode.make(
             f"http://{ip}:{web_port}/controller.html?ws=ws://{ip}:{base_ws_port}",
