@@ -14,31 +14,26 @@ OS-specific path like "/tmp" (which doesn't exist on Windows).
 Usage: python tools/make_controller_qr.py [web_port] [base_ws_port]
 """
 
-import socket
 import sys
 import tempfile
 from pathlib import Path
 
 import qrcode
 
+from lan_ip import lan_ip
+
 MAX_PLAYERS = 4
 REPO_ROOT = Path(__file__).resolve().parent.parent
-
-
-def local_ip() -> str:
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        s.connect(("8.8.8.8", 80))
-        return s.getsockname()[0]
-    finally:
-        s.close()
 
 
 def main() -> None:
     web_port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
     base_ws_port = int(sys.argv[2]) if len(sys.argv) > 2 else 8765
 
-    ip = local_ip()
+    ip = lan_ip()
+    if ip == "127.0.0.1":
+        print("WARNING: no LAN address found — phones won't be able to connect. "
+              "Join a Wi-Fi network or set DS64_HOST=<this computer's IP>.")
     tmp_dir = Path(tempfile.gettempdir())
 
     for i in range(MAX_PLAYERS):

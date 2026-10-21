@@ -5,6 +5,7 @@
 #include <Python.h>
 
 #include "PhoneController.h"
+#include "main.h"
 #include "EmuInstance.h"
 
 #include <QDebug>
@@ -100,7 +101,8 @@ void PhoneController::WorkerLoop()
         // websockets isn't installed for the system interpreter we embed
         // — reuse the project's venv (same one GestureController uses).
 #ifdef GESTURE_VENV_SITE_PACKAGES
-        PyObject* venvDir = PyUnicode_FromString(GESTURE_VENV_SITE_PACKAGES);
+        QByteArray venvSite = ds64Path("DS64_VENV_SITE_PACKAGES", GESTURE_VENV_SITE_PACKAGES).toUtf8();
+        PyObject* venvDir = PyUnicode_FromString(venvSite.constData());
         PyList_Append(sysPath, venvDir);
         Py_DECREF(venvDir);
 #endif

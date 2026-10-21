@@ -32,9 +32,9 @@ import os
 import platform
 import shutil
 import signal
-import socket
 import subprocess
 import sys
+import sysconfig
 import tempfile
 import time
 from pathlib import Path
@@ -83,6 +83,13 @@ def ensure_venv() -> None:
         [str(venv_python()), "-m", "pip", "install", "-q", "-r", str(REPO_ROOT / "requirements.txt")],
         check=True,
     )
+
+    has_mediapipe = subprocess.run(
+        [str(venv_python()), "-c", "import importlib.util, sys; sys.exit(importlib.util.find_spec('mediapipe') is None)"],
+    ).returncode == 0
+    if not has_mediapipe:
+        warn("mediapipe isn't available for this Python version (needs <= 3.12) —")
+        warn("Camera mode won't work; Phone mode is unaffected.")
 
 
 def reexec_under_venv_if_needed() -> None:
@@ -271,14 +278,11 @@ def kill_port(port: int) -> None:
 
 
 def local_ip() -> str:
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        s.connect(("8.8.8.8", 80))
-        return s.getsockname()[0]
-    except OSError:
-        return "127.0.0.1"
-    finally:
-        s.close()
+    # Same picker the QR generator uses (needs psutil, so venv-only —
+    # imported lazily like kill_port's psutil import above).
+    sys.path.insert(0, str(REPO_ROOT / "tools"))
+    from lan_ip import lan_ip
+    return lan_ip()
 
 
 # -------------------------------------------------------------- windowing -
@@ -394,8 +398,18 @@ def main() -> None:
     log("Launching melonDS...")
     melon_log_path = Path(tempfile.gettempdir()) / "melonds_play.log"
     melon_log = open(melon_log_path, "w", encoding="utf-8", errors="replace")
+    # Tell the embedded Python where this checkout's scripts and venv
+    # actually are — a prebuilt release binary only knows the CI runner's
+    # paths (see ds64Path() in melonDS's main.cpp). We're running under
+    # the venv's interpreter by now, so purelib is its site-packages.
+    melon_env = dict(
+        os.environ,
+        DS64_PHONE_SCRIPT_DIR=str(MELONDS_SRC / "tools" / "phone"),
+        DS64_GESTURE_SCRIPT_DIR=str(MELONDS_SRC / "tools" / "gesture"),
+        DS64_VENV_SITE_PACKAGES=sysconfig.get_paths()["purelib"],
+    )
     melon_proc = subprocess.Popen([str(binary), "-b", "auto", str(rom_path)],
-                                   stdout=melon_log, stderr=subprocess.STDOUT)
+                                   stdout=melon_log, stderr=subprocess.STDOUT, env=melon_env)
 
     log("Waiting for melonDS to start...")
     for _ in range(600):

@@ -273,7 +273,7 @@ EmuInstance::EmuInstance(int inst) : deleting(false),
         {
             g_DS64TotalPlayers = 1;
             gestureController = new GestureController();
-            gestureController->Prepare(QString(GESTURE_SCRIPT_DIR));
+            gestureController->Prepare(ds64Path("DS64_GESTURE_SCRIPT_DIR", GESTURE_SCRIPT_DIR));
         }
         else
         {
@@ -294,7 +294,7 @@ EmuInstance::EmuInstance(int inst) : deleting(false),
 
             // This instance (id 0) is player 1.
             phoneController = new PhoneController();
-            phoneController->Prepare(QString(PHONE_SCRIPT_DIR), kDS64BasePhonePort + 0);
+            phoneController->Prepare(ds64Path("DS64_PHONE_SCRIPT_DIR", PHONE_SCRIPT_DIR), kDS64BasePhonePort + 0);
 
             // Queue up the remaining players as new instances — but not
             // synchronously, right here: creating another EmuInstance
@@ -337,7 +337,7 @@ EmuInstance::EmuInstance(int inst) : deleting(false),
         int myPort = g_DS64PendingPhonePort;
         g_DS64PendingPhonePort = 0; // consume before any nested creation
         phoneController = new PhoneController();
-        phoneController->Prepare(QString(PHONE_SCRIPT_DIR), myPort);
+        phoneController->Prepare(ds64Path("DS64_PHONE_SCRIPT_DIR", PHONE_SCRIPT_DIR), myPort);
     }
 
     net.RegisterInstance(instanceID);
@@ -381,6 +381,22 @@ EmuInstance::EmuInstance(int inst) : deleting(false),
 
 EmuInstance::~EmuInstance()
 {
+    // DS64 split-screen: every other player's panel lives inside this
+    // (instance 0's) window, and their EmuThreads draw into those panels
+    // every frame. Tearing this window down first freed the panels under
+    // still-running threads — a segfault in drawScreen() that melonDS's
+    // own SIGSEGV handler swallowed, leaving quit hung forever in
+    // emuExit(). Stop the other players before touching our window.
+    if (instanceID == 0)
+    {
+        for (int i = 1; i < g_DS64TotalPlayers; i++)
+        {
+            EmuInstance* other = getEmuInstanceByID(i);
+            if (other && other->embeddedPanel)
+                deleteEmuInstance(i);
+        }
+    }
+
     deleting = true;
     deleteAllWindows();
 
@@ -388,6 +404,15 @@ EmuInstance::~EmuInstance()
     emuThread->wait();
     delete emuThread;
     emuThread = nullptr;
+
+    // Our thread is stopped, so nothing draws into the panel any more —
+    // remove it from the host window's grid rather than leaving it there
+    // pointing at this (about to be freed) instance.
+    if (embeddedPanel)
+    {
+        delete embeddedPanel;
+        embeddedPanel = nullptr;
+    }
 
     net.UnregisterInstance(instanceID);
 
